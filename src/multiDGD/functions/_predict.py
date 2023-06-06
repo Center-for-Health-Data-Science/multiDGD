@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from tqdm import trange
 from multiDGD.latent import RepresentationLayer
 from multiDGD.latent import GaussianMixture
 
@@ -144,18 +145,23 @@ def learn_new_representations(
             correction_model_optim = torch.optim.Adam(
             correction_model.parameters(), lr=lrs[0], weight_decay=0, betas=(0.5, 0.7)
         )
+    else:
+        test_correction_rep = None
     rep_init_values = None
 
     #####################
     # training reps (only)
     #####################
     print("training selected reps for ", n_epochs, " epochs")
-    for epoch in range(n_epochs):
+
+    progress_bar = trange(n_epochs, desc="Training", unit="epochs")
+    for epoch in progress_bar:
         newrep_optimizer.zero_grad()
         if correction_model is not None:
             correction_rep_optim.zero_grad()
         corr_loss = 0
         e_loss = 0
+        recon_loss = 0
         for x, lib, i in data_loader:
             if correction_hook:
                 correction_model_optim.zero_grad()
@@ -196,12 +202,14 @@ def learn_new_representations(
                 correction_model.weight.grad[:n_correction_classes_old] = 0
                 correction_model_optim.step()
             e_loss += loss.item()
+            recon_loss += recon_loss_x.sum().item()
 
         newrep_optimizer.step()
         if correction_model is not None:
             correction_rep_optim.step()
         e_loss /= (len(data_loader.dataset)*data_loader.dataset.n_features)
-        print("epoch: ", epoch, " loss: ", e_loss)
+        recon_loss /= (len(data_loader.dataset)*data_loader.dataset.n_features)
+        progress_bar.set_postfix(loss=e_loss, reconstruction_loss=recon_loss)
     
     if correction_hook:
         return new_rep, test_correction_rep, correction_model

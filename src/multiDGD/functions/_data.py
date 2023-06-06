@@ -36,8 +36,11 @@ def setup_data(data, modality_key=None, observable_key=None, layer=None, covaria
             print('Warning: No modality key was provided. Assuming that the data is single modality.')
             data.var['modality'] = 'rna'
         else:
-            modalities = data.obs[modality_key].values
-            data.var['modality'] = modalities
+            if modality_key not in data.var.keys():
+                raise ValueError('Modality key not found in data object. Please make sure it is in data.var')
+            else:
+                modalities = data.var[modality_key].values
+                data.var['modality'] = modalities
 
     # if layer is defined, move its content to X
     if layer is not None:

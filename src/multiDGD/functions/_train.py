@@ -2,6 +2,7 @@ import os
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from multiDGD.latent import RepresentationLayer
 from multiDGD.functions._metrics import clustering_metric, rep_triangle_loss
@@ -268,6 +269,10 @@ def train_dgd(
             reconstruction_loss[-1] += recon_loss_x.item()
             distribution_loss[-1] += gmm_error.item()
         
+        total_loss[-1] /= (train_loader.dataset.n_features*n_samples)
+        reconstruction_loss[-1] /= (train_loader.dataset.n_features*n_samples)
+        distribution_loss[-1] /= (train_loader.dataset.n_features*n_samples)
+        
         # make updates on representation(s)
         rep_optimizer.step()
         if correction_gmm is not None:
@@ -282,7 +287,7 @@ def train_dgd(
         #distribution_loss[-1] /= n_samples
         
         if not developer_mode:
-            progress_bar.set_postfix(loss=total_loss[-1]/(train_loader.dataset.n_features*n_samples), reconstruction_loss=reconstruction_loss[-1]/(train_loader.dataset.n_features*n_samples))
+            progress_bar.set_postfix(loss=total_loss[-1], reconstruction_loss=reconstruction_loss[-1])
         
         ###
         # validation run (in case)
@@ -340,9 +345,9 @@ def train_dgd(
             
             #if stop_method == 'loss':
             #    early_stopping_metric[-1] /= n_samples_val
-            #total_loss_val[-1] /= n_samples_val
-            #reconstruction_loss_val[-1] /= n_samples_val
-            #distribution_loss_val[-1] /= n_samples_val
+            total_loss_val[-1] /= (train_loader.dataset.n_features*n_samples_val)
+            reconstruction_loss_val[-1] /= (train_loader.dataset.n_features*n_samples_val)
+            distribution_loss_val[-1] /= (train_loader.dataset.n_features*n_samples_val)
         
         if developer_mode:
             log_dict = {'total_loss_train': total_loss[-1]/(n_samples*train_loader.dataset.n_features),
@@ -380,17 +385,21 @@ def train_dgd(
             else:
                 early_stopping_queue.append(early_stopping_metric[-1])
     
-    if not developer_mode:
-        if validation:
-            plt.plot(np.arange(len(total_loss)),np.array(total_loss)/(train_loader.dataset.n_features*n_samples),'purple',label='train')
-            plt.plot(np.arange(len(total_loss)),np.array(total_loss_val)/(train_loader.dataset.n_features*n_samples_val),'orange',label='validation')
-            plt.xlabel('epoch')
-            plt.ylabel('loss')
-            plt.legend()
-            plt.show()
-        else:
-            plt.plot(np.arange(len(total_loss)),np.array(total_loss)/(train_loader.dataset.n_features*n_samples),'purple')
-            plt.xlabel('epoch')
-            plt.ylabel('loss')
-            plt.show()
-    return decoder, gmm, representation, validation_rep, correction_gmm, correction_rep, correction_val_rep
+    history = pd.DataFrame({
+        'epoch': np.arange(len(total_loss)),
+        'total_loss': total_loss,
+        'reconstruction_loss': reconstruction_loss,
+        'distribution_loss': distribution_loss,
+        'split': 'train'
+    })
+    if validation:
+        temp_history = pd.DataFrame({
+            'epoch': np.arange(len(total_loss_val)),
+            'total_loss': total_loss_val,
+            'reconstruction_loss': reconstruction_loss_val,
+            'distribution_loss': distribution_loss_val,
+            'split': 'validation'
+        })
+        history = pd.concat([history, temp_history])
+
+    return decoder, gmm, representation, validation_rep, correction_gmm, correction_rep, correction_val_rep, history

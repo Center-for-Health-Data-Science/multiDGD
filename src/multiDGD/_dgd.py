@@ -1,8 +1,10 @@
 import torch
 import torch.nn as nn
 import numpy as np
+import pandas as pd
 #import wandb
 import json
+import scipy.sparse
 
 from multiDGD.dataset import omicsDataset
 from multiDGD.latent import RepresentationLayer
@@ -67,7 +69,7 @@ class DGD(nn.Module):
             save_dir='./',
             random_seed = 0,
             model_name='dgd',
-            print_outputs=True
+            print_outputs=False
         ):
         super().__init__()
 
@@ -135,38 +137,28 @@ class DGD(nn.Module):
             print('#######################')
         
         self.train_set = omicsDataset(data, split='train', scaling_type=self._scaling)
-        self.val_set = omicsDataset(data, split='validation', scaling_type=self._scaling) # if there is no validation, return None
-        
-        if self._print_output:
-            print(self.train_set)
+        if 'validation' in data.obs['train_val_test'].values:
+            self.val_set = omicsDataset(data, split='validation', scaling_type=self._scaling) # if there is no validation, return None
+        if 'test' in data.obs['train_val_test'].values:
+            self.test_set = omicsDataset(data, split='test', scaling_type=self._scaling)
+        # create the train, val and test indices like in multivi
+        self.train_indices = np.where(data.obs['train_val_test'].values == 'train')[0]
+        self.validation_indices = np.where(data.obs['train_val_test'].values == 'validation')[0]
+        self.test_indices = np.where(data.obs['train_val_test'].values == 'test')[0]
+        self.total_cells = data.n_obs
+
+        # save the data split in case people don't keep this info
+        self.save_data_splits(data)
+
 
     def _init_parameter_dictionary(self, init_dict=None):
         '''initialize the parameter dictionary from default and update with optional input'''
         # init parameter dictionary based on defaults
         # Opening JSON file
-        out_dict = {
-            'latent_dimension': 20,
-            'n_components': 1,
-            'n_hidden': 1,
-            'n_hidden_modality': 1,
-            'n_units': 100,
-            'value_init': 'zero', # options are zero or handed values
-            'softball_scale': 2,
-            'softball_hardness': 5,
-            'sd_sd': 1,
-            'softball_scale_corr': 2,
-            'softball_hardness_corr': 5,
-            'sd_sd_corr': 1,
-            'dirichlet_a': 1,
-            'batch_size': 128,
-            'learning_rates': [1e-4, 1e-2, 1e-2],
-            'betas': [0.5,0.7],
-            'weight_decay': 1e-4,
-            'decoder_width': 1,
-            'log_wandb': ['username', 'projectname']
-        }
+        out_dict = default_parameters
         #"""
-        out_dict['sd_mean'] = round((2*out_dict['softball_scale'])/(10*out_dict['n_components']),2)
+        if "sd_mean" not in out_dict.keys():
+            out_dict['sd_mean'] = 0.2 * round((out_dict['softball_scale'])/(out_dict['n_components']),2)
         # update from optional class input dictionary
         if init_dict is not None:
             for key in init_dict.keys():
@@ -190,7 +182,9 @@ class DGD(nn.Module):
                 select_n_components = True
             if select_n_components:
                 out_dict['n_components'] = int(len(list(set(self.train_set.meta))))
-                print('selected ',out_dict['n_components'],' number of Gaussian mixture components based on ',self._clustering_variable)
+                print('selected ',out_dict['n_components'],' number of Gaussian mixture components based on the provided observable.')
+        else:
+            print("WARNING: Neither observable key nor number of Gaussian components was provided. Creating the embedding based on a single Gaussian, which will most likely result in a lower-quality embedding.")
         
         # overwrite hyperparameters with passed parameter_dictionary (if applicable)
         # it is crucial to update the initial value for the GMM component std if number of component changes from default
@@ -202,6 +196,7 @@ class DGD(nn.Module):
         if override_sd_init:
             out_dict['sd_mean'] = round((2*out_dict['softball_scale'])/(10*out_dict['n_components']),2)
         
+        self.latent = out_dict['latent_dimension']
         return out_dict
     
     def _init_gmm(self):
@@ -233,12 +228,12 @@ class DGD(nn.Module):
                 value_init=self.param_dict['value_init']).to(device)
         self.test_rep = None
     
-    def _init_correction_models(self, correction, dim=2):
+    def _init_correction_models(self, dim=2):
         '''
         create correction models (additional, disentangled representation + gmm instances)
         the correction input is None or a string as the feature name
         '''
-        if correction is not None:
+        if self.train_set.correction is not None:
             n_correction_classes = self.train_set.correction_classes
             self.correction_gmm = GaussianMixtureSupervised(
                     Nclass=n_correction_classes,Ncompperclass=1,dim=dim,
@@ -253,6 +248,7 @@ class DGD(nn.Module):
                 self.correction_val_rep = RepresentationLayer(
                         n_rep=dim,n_sample=self.val_set.n_sample,
                         value_init='zero').to(device)
+            print("Covariate model initialized as:")
             print(self.correction_gmm)
         else:
             self.correction_gmm = None
@@ -279,6 +275,9 @@ class DGD(nn.Module):
         print('#######################')
         print(self.trained_status.item())
     
+    def is_trained(self):
+        print(self.trained_status.item())
+    
     def train(self, n_epochs=500, stop_with='loss', stop_after=10, train_minimum=50, developer_mode=False):
         '''
         train model for n_epochs
@@ -300,20 +299,32 @@ class DGD(nn.Module):
         # first step is to transform the data into tensors
         print('Preparing data loaders')
         self.train_set.data_to_tensor()
-        train_loader = torch.utils.data.DataLoader(
-            self.train_set, batch_size=self.param_dict['batch_size'],
-            shuffle=True, num_workers=0
-            )
+        if self.train_set.sparse:
+            train_loader = torch.utils.data.DataLoader(
+                self.train_set, batch_size=self.param_dict['batch_size'],
+                shuffle=True, num_workers=0, collate_fn=collate_sparse_batches
+                )
+        else:
+            train_loader = torch.utils.data.DataLoader(
+                self.train_set, batch_size=self.param_dict['batch_size'],
+                shuffle=True, num_workers=0
+                )
         validation_loader = None
         if self.validation_rep is not None:
             self.val_set.data_to_tensor()
-            validation_loader = torch.utils.data.DataLoader(
+            if self.val_set.sparse:
+                validation_loader = torch.utils.data.DataLoader(
+                    self.val_set, batch_size=self.param_dict['batch_size'],
+                    shuffle=True, num_workers=0, collate_fn=collate_sparse_batches
+                    )
+            else:
+                validation_loader = torch.utils.data.DataLoader(
                 self.val_set, batch_size=self.param_dict['batch_size'],
                 shuffle=True, num_workers=0
                 )
         
         print('Now training')
-        self.decoder, self.gmm, self.representation, self.validation_rep, self.correction_gmm, self.correction_rep, self.correction_val_rep = train_dgd(
+        self.decoder, self.gmm, self.representation, self.validation_rep, self.correction_gmm, self.correction_rep, self.correction_val_rep, self.history = train_dgd(
             self.decoder, self.gmm, self.representation, 
             self.validation_rep, train_loader, validation_loader,
             self.correction_gmm, self.correction_rep, self.correction_val_rep, n_epochs,
@@ -402,11 +413,18 @@ class DGD(nn.Module):
         #with open(save_dir+'_hyperparameters.yml', 'w') as outfile:
         #    yaml.dump(self.param_dict, outfile, default_flow_style=False)
     
+    def save_data_splits(self, data):
+        # save as csv with the obs names
+        df_out = data.obs.copy()
+        df_out.to_csv(self._save_dir+'_obs.csv')
+    
+    def load_data_splits(self):
+        df_in = pd.read_csv(self._save_dir+'_obs.csv')
+        return df_in["train_val_test"].values
+    
     @classmethod
     def load(cls,
             data,
-            train_validation_split=None,
-            feature_selection=None,
             save_dir='./',
             random_seed = 0,
             model_name='dgd'
@@ -416,22 +434,13 @@ class DGD(nn.Module):
         with open(save_dir+model_name+'_hyperparameters.json', 'r') as fp:
             param_dict = json.load(fp)
         scaling = param_dict['scaling']
-        meta_label = param_dict['clustering_variable(meta)']
-        correction = param_dict['correction_variable']
-        modality_switch = param_dict['modality_switch']
-        modalities = param_dict['modalities']
+        data.obs["train_val_test"] = cls.load_data_splits(save_dir)
 
         # init model
         model = cls(
                 data=data,
                 parameter_dictionary=param_dict,
-                train_validation_split=train_validation_split,
-                modalities=modalities,
                 scaling=scaling,
-                meta_label=meta_label,
-                modality_switch=modality_switch,
-                correction=correction,
-                feature_selection=feature_selection,
                 save_dir=save_dir,
                 random_seed = random_seed,
                 model_name=model_name,
@@ -456,38 +465,36 @@ class DGD(nn.Module):
         else:
             return self.representation.z.detach().cpu().numpy()
     
+    def test(self, testdata=None, n_epochs=20):
+        self.predict_new(testdata=testdata, n_epochs=n_epochs)
+
+    def predict(self, testdata=None, n_epochs=20):
+        self.predict_new(testdata=testdata, n_epochs=n_epochs)
+        
     def init_test_set(self, testdata):
-        self.test_set = omicsDataset(
-            testdata,
-            self.param_dict['modality_switch'],
-            self.param_dict['scaling'],
-            self.param_dict['clustering_variable(meta)'],
-            self.param_dict['correction_variable'],
-            self.param_dict['modalities'])
+        self.test_set = omicsDataset(testdata, split='test', scaling_type=self._scaling)
         self.test_set.data_to_tensor()
     
-    def predict_new(self, testdata, n_epochs=10, include_correction_error=True, indices_of_new_distribution=None):
+    def predict_new(self, testdata=None, n_epochs=20, include_correction_error=True, indices_of_new_distribution=None):
         '''learn the embedding for new datapoints'''
 
         # prepare test set and loader
-        self.test_set = omicsDataset(
-            testdata,
-            self.param_dict['modality_switch'],
-            self.param_dict['scaling'],
-            self.param_dict['clustering_variable(meta)'],
-            self.param_dict['correction_variable'],
-            self.param_dict['modalities'])
-        self.test_set.data_to_tensor()
-        test_loader = torch.utils.data.DataLoader(
+        if testdata is not None:
+            self.init_test_set(testdata)
+        else:
+            self.test_set.data_to_tensor()
+            if not hasattr(self, "test_set"):
+                raise ValueError("No data was provided.")
+        if self.test_set.sparse:
+            test_loader = torch.utils.data.DataLoader(
+                self.test_set, batch_size=8,
+                shuffle=True, num_workers=0, collate_fn=collate_sparse_batches
+                )
+        else:
+            test_loader = torch.utils.data.DataLoader(
             self.test_set, batch_size=8,
             shuffle=True, num_workers=0
             )
-        print(test_loader.dataset.data[0,:20])
-        
-        # init new representation
-        #self.test_rep = RepresentationLayer(n_rep=self.param_dict['latent_dimension'],
-        #    n_sample=self.test_set.n_sample,
-        #    value_init=self.param_dict['value_init']).to(device)
         
         # train that representation
         self.test_rep, self.correction_test_rep, new_correction_model = learn_new_representations(
@@ -658,3 +665,112 @@ class DGD(nn.Module):
         shape = dataset.X.shape[0]
         predictions = self.decoder_forward(shape, torch.arange(shape))
         return predictions
+    
+    def view_data_setup(self):
+        print("The prepared data consists of the following training set:")
+        print(self.train_set)
+        if hasattr(self, "val_set"):
+            print("There is also a validation set with {} samples".format(self.val_set.n_sample))
+        if hasattr(self, "test_set"):
+            print("And a test set with {} samples".format(self.test_set.n_sample))
+    
+    def get_representation(self, split='train'):
+        if split == 'train':
+            return self.representation.z.detach().cpu().numpy()
+        elif split == 'validation':
+            return self.validation_rep.z.detach().cpu().numpy()
+        elif split == 'test':
+            return self.test_rep.z.detach().cpu().numpy()
+        elif split == 'all':
+            # create a zero numpy array and fill it with all representations according to the data split
+            latent = np.zeros((self.total_cells, self.latent))
+            latent[self.train_indices,:] = self.representation.z.detach().cpu().numpy()
+            latent[self.validation_indices,:] = self.validation_rep.z.detach().cpu().numpy()
+            latent[self.test_indices,:] = self.test_rep.z.detach().cpu().numpy()
+            return latent
+    
+    def clustering(self, split='train'):
+        if split == 'train':
+            return self.gmm.clustering(self.representation.z.detach()).detach().cpu().numpy().astype(int)
+        elif split == 'validation':
+            return self.gmm.clustering(self.validation_rep.z.detach()).detach().cpu().numpy().astype(int)
+        elif split == 'test':
+            return self.gmm.clustering(self.test_rep.z.detach()).detach().cpu().numpy().astype(int)
+        elif split == 'all':
+            # create a zero numpy array and fill it with all representations according to the data split
+            latent = np.zeros(self.total_cells)
+            latent[self.train_indices] = self.gmm.clustering(self.representation.z.detach()).detach().cpu().numpy()
+            latent[self.validation_indices] = self.gmm.clustering(self.validation_rep.z.detach()).detach().cpu().numpy()
+            latent[self.test_indices] = self.gmm.clustering(self.test_rep.z.detach()).detach().cpu().numpy()
+            return latent.astype(int)
+        
+    def plot_history(self):
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
+        sns.lineplot(
+            data=self.history,
+            x='epoch', y='reconstruction_loss', hue='split'
+        )
+        plt.show()
+    
+    def plot_latent_space(self):
+        from sklearn.decomposition import PCA
+        import matplotlib.pyplot as plt
+        # get the train rep
+        rep = self.representation.z.detach().numpy()
+        # do a pca
+        pca = PCA(n_components=2)
+        pca.fit(rep)
+        # transform
+        rep_pca = pca.transform(rep)
+        # get the gmm means
+        gmm_means = self.gmm.mean.detach().numpy()
+        # transform
+        gmm_means_pca = pca.transform(gmm_means)
+        # also do samples from the means
+        gmm_samples = self.gmm.sample(int(self.train_set.n_sample/10)).detach().numpy()
+        gmm_samples_pca = pca.transform(gmm_samples)
+        # plot
+        plt.scatter(rep_pca[:,0], rep_pca[:,1], c='b', s=1, alpha=0.5)
+        plt.scatter(gmm_samples_pca[:,0], gmm_samples_pca[:,1], c='y', s=1, alpha=0.5)
+        plt.scatter(gmm_means_pca[:,0], gmm_means_pca[:,1], c='r', s=10)
+        plt.show()
+
+default_parameters = {
+            'latent_dimension': 20,
+            'n_components': 1,
+            'n_hidden': 2,
+            'n_hidden_modality': 3,
+            'n_units': 100,
+            'value_init': 'zero', # options are zero or handed values
+            'softball_scale': 2,
+            'softball_hardness': 5,
+            'sd_sd': 1,
+            'softball_scale_corr': 2,
+            'softball_hardness_corr': 5,
+            'sd_sd_corr': 1,
+            'dirichlet_a': 1,
+            'batch_size': 128,
+            'learning_rates': [1e-4, 1e-2, 1e-2],
+            'betas': [0.5,0.7],
+            'weight_decay': 1e-4,
+            'decoder_width': 1,
+            'log_wandb': ['username', 'projectname']
+        }
+
+###
+# functions used for the sparse option
+# here the data will have to be transformed to dense format when a batch is called
+###
+
+def sparse_coo_to_tensor(mtrx):
+    return torch.FloatTensor(mtrx.todense())
+
+def collate_sparse_batches(batch):
+    data_batch, library_batch, idx_batch = zip(*batch)
+    data_batch = scipy.sparse.vstack(list(data_batch))
+    data_batch = sparse_coo_to_tensor(data_batch)
+    library_batch = torch.stack(list(library_batch), dim=0)
+    idx_batch = list(idx_batch)
+    return data_batch, library_batch, idx_batch

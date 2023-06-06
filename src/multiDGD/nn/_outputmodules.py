@@ -264,9 +264,9 @@ class NB_Layer(nn.Module):
             self._activation = 'softmax'
     
     def forward(self, x):
-        #return F.softmax(x,dim=-1)
+        return F.softmax(x,dim=-1)
         #return F.softplus(x)
-        return F.sigmoid(x)
+        #return torch.sigmoid(x)
     
     @staticmethod
     def rescale(scaling_factor,model_output):

@@ -283,6 +283,10 @@ class GaussianMixture(nn.Module):
         y = y + torch.log_softmax(self.weight,dim=0)
         return torch.exp(y)
     
+    def clustering(self, x):
+        '''compute the cluster assignment (as int) for each sample'''
+        return torch.argmax(self.sample_probs(x),dim=-1).to(torch.int16)
+    
     def __str__(self):
         return f"""
         Gaussian_mix_compture:
@@ -307,100 +311,6 @@ class GaussianMixture(nn.Module):
         else:
             samples = self.component_sample(n_new_samples).view(-1,self.dim).cpu().detach()
         return samples
-    
-    """
-    def sample_new_points(self, n_points, option='random', n_new=1):
-        '''
-        Generates samples for each new data point
-            - n_points defines the number of new data points to learn
-            - option defines which of 2 schemes to use
-                - random: sample n_new vectors from each component
-                    -> n_mix_comp * n_new values per new point
-                - mean: take the mean of each component as initial representation values
-                    -> n_mix_comp values per new point
-        The order of repetition in both options is [a,a,a, b,b,b, c,c,c] on data point ID.
-        '''
-        self.__new_samples = n_new
-        multiplier = self.n_mix_comp
-        if option == 'random':
-            out = self.component_sample(n_points*n_new)
-            multiplier *= n_new
-
-        elif option == 'mean':
-            with torch.no_grad():
-                out = torch.repeat_interleave(self.mean.clone().cpu().detach().unsqueeze(0), n_points, dim=0)
-        else:
-            print("Please specify how to initialize new representations correctly \nThe options are 'random' and 'mean'.")
-        return out.view(n_points*self.__new_samples*self.n_mix_comp,self.dim)
-    
-    def reshape_targets(self, y, y_type='true'):
-        '''
-        Since we have multiple representations for the same new data point,
-        we need to reshape the output a little to calculate the losses
-        Depending on the y_type, y can be
-            - the true targets (y_type: 'true')
-            - the model predictions (y_type: 'predicted') (can also be used for rep.z in dataloader loop)
-            - the 4-dimensional representation or the loss (y_type: 'reverse')
-        '''
-        if y_type == 'true':
-            if len(y.shape) > 2:
-                raise ValueError('Unexpected shape in input to function reshape_targets. Expected 2 dimensions, got '+str(len(y.shape)))
-            return y.unsqueeze(1).unsqueeze(1).expand(-1,self.__new_samples,self.n_mix_comp,-1)
-        elif y_type == 'predicted':
-            if len(y.shape) > 2:
-                raise ValueError('Unexpected shape in input to function reshape_targets. Expected 2 dimensions, got '+str(len(y.shape)))
-            n_points = int(torch.numel(y) / (self.__new_samples*self.n_mix_comp*y.shape[-1]))
-            return y.view(n_points,self.__new_samples,self.n_mix_comp,y.shape[-1])
-        elif 'reverse':
-            if len(y.shape) < 4:
-                # this case is for when the losses are of shape (n_points,self.new_samples,self.n_mix_comp)
-                return y.view(y.shape[0]*self.__new_samples*self.n_mix_comp)
-            else:
-                return y.view(y.shape[0]*self.__new_samples*self.n_mix_comp,y.shape[-1])
-        else:
-            raise ValueError("The y_type in function reshape_targets was incorrect. Please choose between 'true' and 'predicted'.")
-        
-    def choose_best_representations(self, x, losses):
-        '''
-        Selects the representation for each new datapoint that maximizes the objective
-            - x are the newly learned representations
-            - x and losses have to have the same shape in the first dimension
-              make sure that the losses are only summed over the output dimension
-        Outputs new representation values
-        '''
-        n_points = int(torch.numel(losses) / (self.__new_samples*self.n_mix_comp))
-        best_sample = torch.argmin(losses.view(-1,self.__new_samples*self.n_mix_comp), dim=1).squeeze(-1)
-        best_rep = x.view(n_points,self.__new_samples*self.n_mix_comp,self.dim)[range(n_points),best_sample]
-        return best_rep
-    
-    def choose_old_or_new(self, z_new, loss_new, z_old, loss_old):
-        '''
-        Allows to retrain representations
-        After new representations have been learned, the best new ones are tested against the original representations
-        and the best of either are returned.
-        This can be applied when hoping to get out of local minima and when samples have been learned in the "wrong"
-        components.
-        '''
-        if (len(z_new.shape) == 2) and (len(z_old.shape) == 2):
-            z_conc = torch.cat((z_new.unsqueeze(1),z_old.unsqueeze(1)),dim=1)
-        else:
-            raise ValueError('Unexpected shape in input to function choose_old_or_new. Expected 2 dimensions for z_new and z_old, got '+str(len(z_new.shape))+' and '+str(len(z_old.shape)))
-        
-        len_loss_new = len(loss_new.shape)
-        for l in range(3-len_loss_new):
-            loss_new = loss_new.unsqueeze(1)
-        len_loss_old = len(loss_old.shape)
-        for l in range(3-len_loss_old):
-            loss_old = loss_old.unsqueeze(1)
-        losses = torch.cat((loss_new,loss_old),dim=1)
-
-        best_sample = torch.argmin(losses, dim=1).squeeze(-1)
-        #print(str(best_sample.sum().item())+' out of '+str(z_new.shape[0])+' samples were resampled.')
-        
-        best_rep = z_conc[range(z_conc.shape[0]),best_sample]
-
-        return best_rep, round((best_sample.sum().item()/ z_new.shape[0])*100,2)
-    """
 
 class GaussianMixtureSupervised(GaussianMixture):
     '''
