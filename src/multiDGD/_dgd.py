@@ -11,6 +11,7 @@ from multiDGD.latent import RepresentationLayer
 from multiDGD.latent import GaussianMixture, GaussianMixtureSupervised
 from multiDGD.nn import Decoder
 from multiDGD.functions import train_dgd, set_random_seed, count_parameters, sc_feature_selection, learn_new_representations
+from multiDGD.functions._gene2peak import predict_perturbations
 
 # define device (gpu or cpu)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -418,10 +419,6 @@ class DGD(nn.Module):
         df_out = data.obs.copy()
         df_out.to_csv(self._save_dir+'_obs.csv')
     
-    def load_data_splits(self):
-        df_in = pd.read_csv(self._save_dir+'_obs.csv')
-        return df_in["train_val_test"].values
-    
     @classmethod
     def load(cls,
             data,
@@ -434,7 +431,7 @@ class DGD(nn.Module):
         with open(save_dir+model_name+'_hyperparameters.json', 'r') as fp:
             param_dict = json.load(fp)
         scaling = param_dict['scaling']
-        data.obs["train_val_test"] = cls.load_data_splits(save_dir)
+        data.obs["train_val_test"] = load_data_splits(save_dir)
 
         # init model
         model = cls(
@@ -717,25 +714,51 @@ class DGD(nn.Module):
     def plot_latent_space(self):
         from sklearn.decomposition import PCA
         import matplotlib.pyplot as plt
+        palette = ['#58A6A6', '#EFA355', '#421E22']
         # get the train rep
-        rep = self.representation.z.detach().numpy()
+        rep = self.representation.z.detach().cpu().numpy()
         # do a pca
         pca = PCA(n_components=2)
         pca.fit(rep)
         # transform
         rep_pca = pca.transform(rep)
         # get the gmm means
-        gmm_means = self.gmm.mean.detach().numpy()
+        gmm_means = self.gmm.mean.detach().cpu().numpy()
         # transform
         gmm_means_pca = pca.transform(gmm_means)
         # also do samples from the means
-        gmm_samples = self.gmm.sample(int(self.train_set.n_sample/10)).detach().numpy()
+        gmm_samples = self.gmm.sample(int(self.train_set.n_sample/10)).detach().cpu().numpy()
         gmm_samples_pca = pca.transform(gmm_samples)
         # plot
-        plt.scatter(rep_pca[:,0], rep_pca[:,1], c='b', s=1, alpha=0.5)
-        plt.scatter(gmm_samples_pca[:,0], gmm_samples_pca[:,1], c='y', s=1, alpha=0.5)
-        plt.scatter(gmm_means_pca[:,0], gmm_means_pca[:,1], c='r', s=10)
+        plt.scatter(rep_pca[:,0], rep_pca[:,1], c=palette[0], s=1, alpha=0.7, label='representation')
+        plt.scatter(gmm_samples_pca[:,0], gmm_samples_pca[:,1], c=palette[1], s=1, alpha=0.7, label='GMM samples')
+        plt.scatter(gmm_means_pca[:,0], gmm_means_pca[:,1], c=palette[2], s=10, alpha=1, label='GMM means')
+        plt.xlabel('PC1')
+        plt.ylabel('PC2')
+        plt.title('Latent space PCA')
+        plt.legend()
         plt.show()
+    
+    def gene2peak(self, gene_name, testset, gene_ref=None):
+        if gene_name not in testset.var_names:
+            if gene_ref is not None:
+                if isinstance(gene_ref, str):
+                    gene_ref = testset.var[gene_ref]
+                else:
+                    raise ValueError("gene_ref must be a string")
+            else:
+                raise ValueError("Gene was not found in data. It might be spelled wrong or you need to specify the var column name that contains the gene name.")
+        else:
+            gene_ref = testset.var_names
+        gene_id = np.where(gene_ref == gene_name)[0][0]
+        predictions_original_gene, predictions_upregulated_gene, indices_of_interest_gene = predict_perturbations(self, testset, gene_id)
+        predicted_changes = [(predictions_upregulated_gene[i] - predictions_original_gene[i]) for i in range(len(self.train_set.modalities))]
+        return predicted_changes, indices_of_interest_gene
+
+
+def load_data_splits(save_dir):
+    df_in = pd.read_csv(save_dir+'_obs.csv')
+    return df_in["train_val_test"].values
 
 default_parameters = {
             'latent_dimension': 20,

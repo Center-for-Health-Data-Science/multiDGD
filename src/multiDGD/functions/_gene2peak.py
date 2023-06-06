@@ -2,14 +2,9 @@ import torch
 import numpy as np
 
 from multiDGD.latent import RepresentationLayer
-from multiDGD.data import omicsDataset
+from multiDGD.dataset import omicsDataset
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-def get_gene_ids(gene_name):
-    gene_id = rna_ref_df[rna_ref_df["gene_name"] == gene_name]["gene_id"].values[0]
-    gene_idx = np.where(rna_ref_df["gene_name"] == gene_name)[0][0]
-    return gene_id, gene_idx
 
 def find_closest_peak(gene_location):
     chrom = int(gene_location.split(":")[0].split("chr")[1])
@@ -34,7 +29,7 @@ def find_closest_start_and_end(chrom, window_start, window_end):
     end_idx = np.argmin(end_distances)
     return sub_df.iloc[start_idx]["idx"].item(), sub_df.iloc[end_idx]["idx"].item()
 
-def predict_perturbations2(model, rep, correction, dataset, modality_id, feature_id, n_epochs=1):
+def predict_perturbations_internal(model, rep, correction, dataset, modality_id, feature_id, n_epochs=1):
     """predict the effect of upregulating or silencing a feature fold_change times"""
     # n_samples = dataset.data.shape[0]
     # batch_size = 128
@@ -72,34 +67,15 @@ def predict_perturbations2(model, rep, correction, dataset, modality_id, feature
     preds = model.predict_from_representation(rep, correction)
     return [x.detach().cpu() for x in preds]
 
-def predict_perturbations_hidden(model, testset, feature_id, step=1):
+def predict_perturbations(model, testset, feature_id, split="test", new_data=False):
     test_set = omicsDataset(
-        testset[::step, :],
-        model.param_dict["modality_switch"],
-        model.param_dict["scaling"],
-        model.param_dict["clustering_variable(meta)"],
-        model.param_dict["correction_variable"],
-        model.param_dict["modalities"],
+        testset,
     )
     test_set.data_to_tensor()
 
-    if step > 1:
-        with torch.no_grad():
-            new_reps = model.test_rep.z[::step, :].detach().cpu()
-        model.test_rep = RepresentationLayer(n_rep=new_reps.shape[1], n_sample=new_reps.shape[0], value_init=new_reps).to(
-            device
-        )
     if not hasattr(model, "correction_test_rep"):  # so that code works for all my models
         if model.correction_gmm is None:
             model.correction_test_rep = None
-    else:
-        if step > 1:
-            with torch.no_grad():
-                new_reps = model.correction_test_rep.z[::step, :].detach().cpu()
-            model.correction_test_rep = RepresentationLayer(
-                n_rep=new_reps.shape[1], n_sample=new_reps.shape[0], value_init=new_reps
-            ).to(device)
-
     
     # get up- and downregulated predictions for our given gene
     reps_original = model.test_rep.z.detach().clone().cpu().numpy()
@@ -116,7 +92,7 @@ def predict_perturbations_hidden(model, testset, feature_id, step=1):
 
     #from omicsdgd.functions._gene_to_peak_linkage import predict_perturbations2
     # run upregulation (1 step) and save predictions
-    predictions_upregulated_gene = predict_perturbations2(
+    predictions_upregulated_gene = predict_perturbations_internal(
         model,
         model.test_rep,
         model.correction_test_rep,
@@ -130,5 +106,5 @@ def predict_perturbations_hidden(model, testset, feature_id, step=1):
     with torch.no_grad():
         model.test_rep.z[:,:] = torch.tensor(reps_original[:,:], device=device)
     torch.cuda.empty_cache()
-    return predictions_original_gene, predictions_upregulated_gene, test_set, indices_of_interest_gene
+    return predictions_original_gene, predictions_upregulated_gene, indices_of_interest_gene
 

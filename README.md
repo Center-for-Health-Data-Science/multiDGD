@@ -20,5 +20,7 @@ python3 -m pip install ./src
 
 ## How to use it
 
-Check out the notebooks showing examples of how to use multiDGD for anndata objects [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/viktoriaschuster/multiDGD/tutorials/example_adata_bonemarrow.ipynb) and mudata objects [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/viktoriaschuster/multiDGD/tutorials/example_mudata_mousegast.ipynb).
+Check out the notebooks showing examples of how to use multiDGD for anndata objects [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/viktoriaschuster/multiDGD/blob/main/tutorials/example_adata_bonemarrow.ipynb) and mudata objects [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/viktoriaschuster/multiDGD/blob/main/tutorials/example_mudata_mousegast.ipynb).
+
+There is also a preliminary tutorial on the gene2peak feature here [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/viktoriaschuster/multiDGD/blob/main/tutorials/gene2peak.ipynb). This is still in development as a tool though and currently only supports a very specific use.
 

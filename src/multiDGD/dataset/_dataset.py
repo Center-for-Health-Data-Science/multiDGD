@@ -34,7 +34,7 @@ class omicsDataset(Dataset):
     def __init__(self,
             data,
             scaling_type='sum', 
-            split='train'
+            split=None
         ):
         '''
         Args: 
@@ -45,13 +45,16 @@ class omicsDataset(Dataset):
                 for different splits of the data. Can be 'train', 'validation', 'test'. default is 'train'. 
         '''
         # reduce the data to the relevant data split
-        if split == 'test': # it can be that one wants to use a completely new data set in "testing"
-            if 'test' not in data.obs['train_val_test'].unique():
-                self.data = data
+        if split is not None:
+            if split == 'test': # it can be that one wants to use a completely new data set in "testing"
+                if 'test' not in data.obs['train_val_test'].unique():
+                    self.data = data
+                else:
+                    self.data = data[data.obs['train_val_test'] == split]
             else:
                 self.data = data[data.obs['train_val_test'] == split]
         else:
-            self.data = data[data.obs['train_val_test'] == split]
+            self.data = data
         
         # now if there is a lot of cells in this data, we will prefer slower training over large memory use
         self.sparse = False
