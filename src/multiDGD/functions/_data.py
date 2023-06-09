@@ -1,9 +1,14 @@
+from typing import Union, Optional, Sequence, Tuple, List, Dict, Any
+from mudata import MuData
+from anndata import AnnData
+
 import anndata as ad
 import mudata as md
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-def setup_data(data, modality_key=None, observable_key=None, layer=None, covariate_keys=None, train_fraction=0.8, include_test=True):
+def setup_data(data: Union[MuData, AnnData], modality_key: str=None, observable_key: str =None, layer: str = None, 
+               covariate_keys: List[str] = None, train_fraction: float =0.8, include_test: bool = True) -> Union[MuData, AnnData]:
     '''
     This function will prepare the data for the model. Input formats can be both anndata and mudata objects.
 
@@ -26,6 +31,11 @@ def setup_data(data, modality_key=None, observable_key=None, layer=None, covaria
         If True, the test set will be included in the data object. The default is True. 
         Otherwise, the split will only be train and validation.
         For integrating a new data set, set the train_fraction to 1.0.
+
+    Returns
+    -------
+    Anndata or mudata object
+
     '''
 
     n_samples = data.shape[0]
