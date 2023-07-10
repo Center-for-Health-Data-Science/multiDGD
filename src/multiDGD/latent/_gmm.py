@@ -202,6 +202,7 @@ class GaussianMixture(nn.Module):
         '''i.e. Dirichlet prior on mixture'''
         # dirichlet alpha determining the uniformity of the weights
         self._weight_alpha = alpha
+        # the dirichlet constant is the normalization constant in form of a beta distribution
         self._dirichlet_constant = math.lgamma(self.n_mix_comp*self._weight_alpha)-self.n_mix_comp*math.lgamma(self._weight_alpha)
         # weights are initialized uniformly so that components start out equi-probable
         self.weight = nn.Parameter(torch.ones(self.n_mix_comp),requires_grad=True)
