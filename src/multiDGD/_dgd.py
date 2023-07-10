@@ -701,7 +701,12 @@ class DGD(nn.Module):
             latent[self.test_indices] = self.gmm.clustering(self.test_rep.z.detach()).detach().cpu().numpy()
             return latent.astype(int)
         
-    def plot_history(self):
+    def plot_history(self, export=False):
+        '''
+        If executed in a jupyter notebook, plots the training history of the model.
+        Otherwise provide an export path to save the plot.
+        '''
+        print('something is changing')
         import matplotlib.pyplot as plt
         import seaborn as sns
 
@@ -709,7 +714,10 @@ class DGD(nn.Module):
             data=self.history,
             x='epoch', y='reconstruction_loss', hue='split'
         )
-        plt.show()
+        if export:
+            plt.savefig(self._save_dir+self._model_name+'_traininghistory.png')
+        else:
+            plt.show()
     
     def plot_latent_space(self):
         from sklearn.decomposition import PCA
