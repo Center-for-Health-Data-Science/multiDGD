@@ -120,13 +120,14 @@ class DGD(nn.Module):
     
     def _init_wandb_logging(self, parameter_dictionary): 
         '''start run if in developer mode (otherwise assumes running in notebook)'''
+        import wandb
         try:
             wandb.init(
                 project=parameter_dictionary['log_wandb'][1], 
                 entity=parameter_dictionary['log_wandb'][0], 
                 config=parameter_dictionary)
         except:
-            raise ValueError('You are trying to run in developer mode, but seem not to have given the parameter dictionary the `log_wandb` statement.')
+            raise ValueError('You are trying to run in developer mode, but seem not to have given the parameter dictionary the `log_wandb` statement or you are not logged in to wandb.')
         wandb.run.name = self._model_name
     
     def _init_data(self, data):
@@ -236,6 +237,8 @@ class DGD(nn.Module):
         '''
         if self.train_set.correction is not None:
             n_correction_classes = self.train_set.correction_classes
+            '''I want to add support for multiple correction variables, but this is not yet implemented'''
+            #n_correction_models = len(n_correction_classes)
             self.correction_gmm = GaussianMixtureSupervised(
                     Nclass=n_correction_classes,Ncompperclass=1,dim=dim,
                     mean_init=(self.param_dict['softball_scale_corr'],self.param_dict['softball_hardness_corr']),
@@ -706,12 +709,16 @@ class DGD(nn.Module):
         If executed in a jupyter notebook, plots the training history of the model.
         Otherwise provide an export path to save the plot.
         '''
-        print('something is changing')
         import matplotlib.pyplot as plt
         import seaborn as sns
 
+        # got error raise ValueError("cannot reindex on an axis with duplicate labels")
+        # so reindex the history
+        history = self.history.reset_index()
+
         sns.lineplot(
-            data=self.history,
+            data=history,
+            #data=self.history,
             x='epoch', y='reconstruction_loss', hue='split'
         )
         if export:
