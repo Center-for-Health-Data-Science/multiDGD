@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='multiDGD',
-      version="0.1",
+      version="0.0.1",
       description='multi-omics implementation of the encoder-less representation learning using MAP estimation from https://arxiv.org/abs/2110.06672',
       author='Viktoria Schuster',
       licence='MIT',
