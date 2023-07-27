@@ -59,6 +59,9 @@ def train_dgd(
 
     if developer_mode:
         import wandb
+    else:
+        silhouette_scores = []
+        aris = []
 
     # get number of samples
     n_samples = representation.n_sample
@@ -350,13 +353,13 @@ def train_dgd(
             distribution_loss_val[-1] /= (train_loader.dataset.n_features*n_samples_val)
         
         if developer_mode:
-            log_dict = {'total_loss_train': total_loss[-1]/(n_samples*train_loader.dataset.n_features),
-                'reconstruction_loss_train': reconstruction_loss[-1]/(n_samples*train_loader.dataset.n_features),
-                'gmm_loss_train': distribution_loss[-1]/(n_samples*gmm.n_mix_comp*gmm.dim)}
+            log_dict = {'total_loss_train': total_loss[-1],#/(n_samples*train_loader.dataset.n_features),
+                'reconstruction_loss_train': reconstruction_loss[-1],#/(n_samples*train_loader.dataset.n_features),
+                'gmm_loss_train': distribution_loss[-1]}#/(n_samples*gmm.n_mix_comp*gmm.dim)}
             if validation:
-                log_dict['total_loss_validation'] = total_loss_val[-1]/(n_samples_val*train_loader.dataset.n_features)
-                log_dict['reconstruction_loss_validation'] = reconstruction_loss_val[-1]/(n_samples_val*train_loader.dataset.n_features)
-                log_dict['gmm_loss_validation'] = distribution_loss_val[-1]/(n_samples_val*gmm.n_mix_comp*gmm.dim)
+                log_dict['total_loss_validation'] = total_loss_val[-1]#/(n_samples_val*train_loader.dataset.n_features)
+                log_dict['reconstruction_loss_validation'] = reconstruction_loss_val[-1]#/(n_samples_val*train_loader.dataset.n_features)
+                log_dict['gmm_loss_validation'] = distribution_loss_val[-1]#/(n_samples_val*gmm.n_mix_comp*gmm.dim)
             # add metrics depending on availability
             if decoder.n_out_groups > 1:
                 for out_mod_id in range(decoder.n_out_groups):
@@ -369,6 +372,11 @@ def train_dgd(
                 log_dict['triangle_rep_loss'] = triangle_loss
 
             wandb.log(log_dict)
+        else:
+            if train_loader.dataset.correction is not None:
+                silhouette_scores.append(silhouette_score(representation.z.detach().cpu(), train_loader.dataset.correction))
+            if train_loader.dataset.meta is not None:
+                aris.append(clustering_metric(representation, gmm, train_loader.dataset.get_labels()))
         
         # early stopping
         if epoch >= train_minimum:
@@ -392,6 +400,11 @@ def train_dgd(
         'distribution_loss': distribution_loss,
         'split': 'train'
     })
+    if not developer_mode:
+        if train_loader.dataset.correction is not None:
+            history['correction_silhouette'] = silhouette_scores
+        if train_loader.dataset.meta is not None:
+            history['meta_ARI'] = aris
     if validation:
         temp_history = pd.DataFrame({
             'epoch': np.arange(len(total_loss_val)),

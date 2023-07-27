@@ -219,10 +219,21 @@ class omicsDataset(Dataset):
             correction_features = self.data.obs[covariates].values
             if type(correction_features) is np.ndarray: # I don't understand what I did here, need to observe
                 if len(correction_features.shape) > 1:
-                    correction_features = correction_features.flatten()
-                n_correction_classes = len(list(np.unique(correction_features)))
+                    n_correction_classes = []
+                    for i in range(correction_features.shape[1]):
+                        n_correction_classes.append(len(list(np.unique(correction_features[:,i]))))
+                    # get unique values per correction feature
+                    #n_correction_classes = list(np.unique(correction_features, axis=0))
+                else:
+                    #correction_features = correction_features.flatten()
+                    n_correction_classes = len(list(np.unique(correction_features)))
             else:
-                n_correction_classes = len(correction_features.unique())
+                n_correction_classes = [len(correction_features.unique())]
+            if len(n_correction_classes) > 1:
+                print('WARNING: multiple correction factors provided. Currently, only one factor is supported.')
+                print('WARNING: the first correction factor will be used.')
+            correction_features = correction_features[:,0]
+            n_correction_classes = n_correction_classes[0]
         
         return meta, correction_features, n_correction_classes
     

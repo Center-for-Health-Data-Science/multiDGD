@@ -22,3 +22,7 @@ pip install .
 
 Check out the notebooks showing examples of how to use multiDGD for anndata objects and mudata objects in the tutorials folder. There is also a preliminary tutorial on the gene2peak feature. This is still in development as a tool though and currently only supports a very specific use.
 
+## We would love your feedback!
+
+Feel free to create issues if you encounter problems or tell us what other functionalities you would like. This is the first version, so it might not all be super smooth yet.
+

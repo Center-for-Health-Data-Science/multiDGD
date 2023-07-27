@@ -6,15 +6,15 @@ requires = ["hatchling"]
 [project]
 name = "multiDGD"
 version = "0.0.1"
-description = "Multi-omics implementation of the encoder-less representation learning using MAP estimation from https://arxiv.org/abs/2110.06672"
+description = "multi-omics implementation of the encoder-less representation learning using MAP estimation from https://arxiv.org/abs/2110.06672"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {file = "LICENSE"}
 authors = [
     {name = "Viktoria Schuster"},
 ]
-urls.Source = "https://github.com/viktoriaschuster/multiDGD"
-urls.Home-page = "https://github.com/viktoriaschuster/multiDGD"
+urls.Source = "https://github.com/Center-for-Health-Data-Science/multiDGD"
+urls.Home-page = "https://github.com/Center-for-Health-Data-Science/multiDGD"
 dependencies = [
     "anndata",
     "mudata",
