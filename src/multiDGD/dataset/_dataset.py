@@ -174,6 +174,7 @@ class omicsDataset(Dataset):
                 # currently only support 2 modalities
                 modality_features = [int(np.where(self.data.var['modality'] == modalities[1])[0][0]), int((self.data.shape[1]-np.where(self.data.var['modality'] == modalities[1])[0][0]))]
             else:
+                switch = None
                 modality_features = [int(self.data.shape[1])]
             return modalities, switch, modality_features
     
