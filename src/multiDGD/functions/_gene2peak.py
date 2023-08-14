@@ -65,7 +65,7 @@ def predict_perturbations_internal(model, rep, correction, dataset, modality_id,
         rep_optimizer.step()
     # return new predictions
     preds = model.predict_from_representation(rep, correction)
-    return [x.detach().cpu() for x in preds]
+    return [x.detach() for x in preds]
 
 def predict_perturbations(model, testset, feature_id, split="test", new_data=False):
     test_set = omicsDataset(
@@ -87,7 +87,7 @@ def predict_perturbations(model, testset, feature_id, split="test", new_data=Fal
     #print("using {} samples".format(len(indices_of_interest)))
 
     predictions_original_gene = model.decoder_forward(rep_shape=model.test_rep.z.shape[0])
-    predictions_original_gene = [x.detach() for x in predictions_original_gene]
+    predictions_original_gene = [x.detach().to(device) for x in predictions_original_gene]
     torch.cuda.empty_cache()
 
     #from omicsdgd.functions._gene_to_peak_linkage import predict_perturbations2
