@@ -689,6 +689,24 @@ class DGD(nn.Module):
             latent[self.test_indices,:] = self.test_rep.z.detach().cpu().numpy()
             return latent
     
+    def get_covariate_representation(self, split='train'):
+        '''This will also need to be changed once multiple covariates are supported'''
+        if self.correction_rep is not None:
+            if split == 'train':
+                return self.correction_rep.z.detach().cpu().numpy()
+            elif split == 'validation':
+                return self.correction_val_rep.z.detach().cpu().numpy()
+            elif split == 'test':
+                return self.correction_test_rep.z.detach().cpu().numpy()
+            elif split == 'all':
+                latent = np.zeros((self.total_cells, self.correction_rep.z.shape[1]))
+                latent[self.train_indices,:] = self.correction_rep.z.detach().cpu().numpy()
+                latent[self.validation_indices,:] = self.correction_val_rep.z.detach().cpu().numpy()
+                latent[self.test_indices,:] = self.correction_test_rep.z.detach().cpu().numpy()
+                return latent
+        else:
+            raise ValueError('covariate representation not available (were not defined)')
+    
     def clustering(self, split='train'):
         if split == 'train':
             return self.gmm.clustering(self.representation.z.detach()).detach().cpu().numpy().astype(int)
