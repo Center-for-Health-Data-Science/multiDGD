@@ -15,7 +15,7 @@ In addition to a general improvement for data integration and clustering, we are
 Since this is the alpha-version and results are not published, the package should be installed by cloning the repository and installing it from source (from the project directory). Obviously, please do not share this code yet since it is all unpublished :blush:.
 
 ```
-python3 -m pip install ./src
+pip install .
 ```
 
 ## How to use it
