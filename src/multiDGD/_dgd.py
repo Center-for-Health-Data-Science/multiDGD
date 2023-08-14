@@ -237,32 +237,44 @@ class DGD(nn.Module):
         '''
         if self.train_set.correction is not None:
             n_correction_classes = self.train_set.correction_classes
-            '''I want to add support for multiple correction variables, but this is not yet implemented'''
-            #n_correction_models = len(n_correction_classes)
-            self.correction_gmm = GaussianMixtureSupervised(
-                    Nclass=n_correction_classes,Ncompperclass=1,dim=dim,
-                    mean_init=(self.param_dict['softball_scale_corr'],self.param_dict['softball_hardness_corr']),
-                    sd_init=(round((2*self.param_dict['softball_scale_corr'])/(10*n_correction_classes),2),
-                    self.param_dict['sd_sd_corr']),alpha=2).to(device)
-            self.correction_rep = RepresentationLayer(
-                    n_rep=dim,n_sample=self.train_set.n_sample,
-                    value_init=self.correction_gmm.supervised_sampling(self.train_set.get_correction_labels(),
-                    sample_type='origin')).to(device)
+            self.n_correction_models = len(n_correction_classes)
+            
+            self.covariate_gmms = nn.ModuleList()
+            self.covariate_reps = nn.ModuleList()
+            for corr_id in range(self.n_correction_models):
+                self.covariate_gmms.append(
+                    GaussianMixtureSupervised(
+                        Nclass=n_correction_classes[corr_id],Ncompperclass=1,dim=dim,
+                        mean_init=(self.param_dict['softball_scale_corr'],self.param_dict['softball_hardness_corr']),
+                        sd_init=(round((2*self.param_dict['softball_scale_corr'])/(10*n_correction_classes[corr_id]),2),
+                        self.param_dict['sd_sd_corr']),alpha=2).to(device)
+                    )
+                self.covariate_reps.append(
+                    RepresentationLayer(
+                        n_rep=dim,n_sample=self.train_set.n_sample,
+                        value_init=self.covariate_models[corr_id].supervised_sampling(self.train_set.get_correction_labels(corr_id),
+                        sample_type='origin')).to(device)
+                    )
             if self.validation_rep is not None:
-                self.correction_val_rep = RepresentationLayer(
-                        n_rep=dim,n_sample=self.val_set.n_sample,
-                        value_init='zero').to(device)
-            print("Covariate model initialized as:")
-            print(self.correction_gmm)
+                self.covariate_val_reps = nn.ModuleList()
+                for corr_id in range(self.n_correction_models):
+                    self.covariate_val_reps.append(
+                        RepresentationLayer(
+                            n_rep=dim,n_sample=self.val_set.n_sample,
+                            value_init="zero").to(device)
+                    )
+            print("Covariate models initialized: ", self.n_correction_models)
         else:
-            self.correction_gmm = None
-            self.correction_rep = None
-            self.correction_val_rep = None
+            self.covariate_gmms = None
+            self.covariate_reps = None
+            self.covariate_val_reps = None
     
     def _init_decoder(self):
         '''create decoder instance'''
-        if self.correction_gmm is not None:
-            updated_latent_dim = self.param_dict['latent_dimension']+self.correction_gmm.dim
+        if self.covariate_gmms is not None:
+            updated_latent_dim = self.param_dict['latent_dimension']
+            for i in range(self.n_correction_models):
+                updated_latent_dim = updated_latent_dim + self.covariate_gmms[i].dim
         else:
             updated_latent_dim = self.param_dict['latent_dimension']
         self.decoder = Decoder(in_features=updated_latent_dim,parameter_dictionary=self.param_dict).to(device)
@@ -328,10 +340,10 @@ class DGD(nn.Module):
                 )
         
         print('Now training')
-        self.decoder, self.gmm, self.representation, self.validation_rep, self.correction_gmm, self.correction_rep, self.correction_val_rep, self.history = train_dgd(
+        self.decoder, self.gmm, self.representation, self.validation_rep, self.covariate_gmms, self.covariate_reps, self.covariate_val_reps, self.history = train_dgd(
             self.decoder, self.gmm, self.representation, 
             self.validation_rep, train_loader, validation_loader,
-            self.correction_gmm, self.correction_rep, self.correction_val_rep, n_epochs,
+            self.covariate_gmms, self.covariate_reps, self.covariate_val_reps, n_epochs,
             learning_rates=self.param_dict['learning_rates'],
             adam_betas=self.param_dict['betas'],wd=self.param_dict['weight_decay'],
             stop_method=stop_with,stop_len=stop_after,train_minimum=train_minimum,
@@ -373,23 +385,30 @@ class DGD(nn.Module):
                 self.validation_rep = RepresentationLayer(n_rep=self.param_dict['latent_dimension'],
                     n_sample=checkpoint['validation_rep.z'].shape[0],
                     value_init=self.param_dict['value_init']).to(device)
-            if self.correction_gmm is not None:
+            if self.covariate_gmms is not None:
                 #if self.correction_val_rep is not None:
                 if (not hasattr(self, 'correction_val_rep')) and (self.validation_rep is not None):
-                    self.correction_val_rep = RepresentationLayer(n_rep=self.correction_gmm.dim,
-                        n_sample=checkpoint['validation_rep.z'].shape[0],
-                        value_init=self.param_dict['value_init']).to(device)
+                    self.covariate_val_reps = nn.ModuleList()
+                    for corr_id in range(self.n_correction_models):
+                        self.covariate_val_reps.append(
+                            RepresentationLayer(
+                                n_rep=self.covariate_gmms[corr_id].dim,n_sample=self.validation_rep.z.shape[0],
+                                value_init=self.param_dict['value_init']).to(device)
+                        )
             #else:
             #    print('careful! no validation representation has been initialized')
         if 'test_rep.z' in list(checkpoint.keys()):
             self.test_rep = RepresentationLayer(n_rep=self.param_dict['latent_dimension'],
                 n_sample=checkpoint['test_rep.z'].shape[0],
                 value_init=self.param_dict['value_init']).to(device)
-            if self.correction_gmm is not None:
-                self.correction_test_rep = RepresentationLayer(
-                            n_rep=self.correction_gmm.dim,
-                            n_sample=self.test_rep.z.shape[0],
-                            value_init='zero').to(device)
+            if self.covariate_gmms is not None:
+                self.covariate_test_reps = nn.ModuleList()
+                for corr_id in range(self.n_correction_models):
+                    self.covariate_test_reps.append(
+                        RepresentationLayer(
+                            n_rep=self.covariate_gmms[corr_id].dim,n_sample=self.test_rep.z.shape[0],
+                            value_init="zero").to(device)
+                    )
                 #if 'new_correction_model' in list(checkpoint.keys()):
         
         # dirty hack because I switched naming for one model and dataset
@@ -497,12 +516,12 @@ class DGD(nn.Module):
             )
         
         # train that representation
-        self.test_rep, self.correction_test_rep, new_correction_model = learn_new_representations(
+        self.test_rep, self.covariate_test_reps, new_correction_model = learn_new_representations(
                 self.gmm,
                 self.decoder,
                 test_loader,
                 self.test_set.n_sample,
-                self.correction_gmm,
+                self.covariate_gmms,
                 n_epochs=n_epochs,
                 include_correction_error=include_correction_error,
                 indices_of_new_distribution=indices_of_new_distribution)
@@ -510,15 +529,23 @@ class DGD(nn.Module):
         # make the new_correction_model an attribute so it is learned
         self.save()
     
-    def decoder_forward(self, rep_shape, i=None):
+    def decoder_forward(self, rep_shape, i=None, split=None):
         if self.representation.z.shape[0] == rep_shape:
-            if self.correction_gmm is not None:
+            if self.covariate_gmms is not None:
                 if i is not None:
                     z = self.representation(i)
-                    z_correction = self.correction_rep(i)
+                    for corr_id in range(self.n_correction_models):
+                        if corr_id == 0:
+                            z_correction = self.covariate_reps[corr_id](i)
+                        else:
+                            z_correction = torch.cat((z_correction,self.covariate_reps[corr_id](i)), dim=1)
                 else:
                     z = self.representation.z
-                    z_correction = self.correction_rep.z
+                    for corr_id in range(self.n_correction_models):
+                        if corr_id == 0:
+                            z_correction = self.covariate_reps[corr_id].z
+                        else:
+                            z_correction = torch.cat((z_correction,self.covariate_reps[corr_id].z), dim=1)
                 #z_correction = torch.cat(tuple([self.correction_models[corr_id][1](i) for corr_id in range(len(self.correction_models))]), dim=1)
                 y = self.decoder(torch.cat((z, z_correction), dim=1))
             else:
@@ -529,13 +556,21 @@ class DGD(nn.Module):
                 y = self.decoder(z)
         elif self.test_rep is not None: # always preferrably use test rep
             if self.test_rep.z.shape[0] == rep_shape:
-                if self.correction_gmm is not None:
+                if self.covariate_gmms is not None:
                     if i is not None:
                         z = self.test_rep(i)
-                        z_correction = self.correction_test_rep(i)
+                        for corr_id in range(self.n_correction_models):
+                            if corr_id == 0:
+                                z_correction = self.covariate_test_reps[corr_id](i)
+                            else:
+                                z_correction = torch.cat((z_correction,self.covariate_test_reps[corr_id](i)), dim=1)
                     else:
                         z = self.test_rep.z
-                        z_correction = self.correction_test_rep.z
+                        for corr_id in range(self.n_correction_models):
+                            if corr_id == 0:
+                                z_correction = self.covariate_test_reps[corr_id].z
+                            else:
+                                z_correction = torch.cat((z_correction,self.covariate_test_reps[corr_id].z), dim=1)
                     #z_correction = torch.cat(tuple([self.test_correction[corr_id](i) for corr_id in range(len(self.correction_models))]), dim=1)
                     y = self.decoder(torch.cat((z, z_correction), dim=1))
                 else:
@@ -546,14 +581,21 @@ class DGD(nn.Module):
                     y = self.decoder(z)
         elif self.validation_rep is not None:
             if self.validation_rep.z.shape[0] == rep_shape:
-                if self.correction_gmm is not None:
+                if self.covariate_gmms is not None:
                     if i is not None:
                         z = self.validation_rep(i)
-                        z_correction = self.correction_val_rep(i)
+                        for corr_id in range(self.n_correction_models):
+                            if corr_id == 0:
+                                z_correction = self.covariate_val_reps[corr_id](i)
+                            else:
+                                z_correction = torch.cat((z_correction,self.covariate_val_reps[corr_id](i)), dim=1)
                     else:
                         z = self.validation_rep.z
-                        z_correction = self.correction_val_rep.z
-                    #z_correction = torch.cat(tuple([self.correction_models[corr_id][2](i) for corr_id in range(len(self.correction_models))]), dim=1)
+                        for corr_id in range(self.n_correction_models):
+                            if corr_id == 0:
+                                z_correction = self.covariate_val_reps[corr_id].z
+                            else:
+                                z_correction = torch.cat((z_correction,self.covariate_val_reps[corr_id].z), dim=1)
                     y = self.decoder(torch.cat((z, z_correction), dim=1))
                 else:
                     if i is not None:
@@ -565,10 +607,14 @@ class DGD(nn.Module):
             raise ValueError('something is wrong with the shape of the dataset you supplied. There is no representation for it.')
         return y
     
-    def predict_from_representation(self, rep, correction_rep=None):
-        if self.correction_gmm is not None:
+    def predict_from_representation(self, rep, correction_reps=None):
+        if self.covariate_gmms is not None:
+            for corr_id in range(self.n_correction_models):
+                if corr_id == 0:
+                    z_correction = correction_reps[corr_id].z
+                else:
+                    z_correction = torch.cat((z_correction,correction_reps[corr_id].z), dim=1)
             z = rep.z
-            z_correction = correction_rep.z
             y = self.decoder(torch.cat((z, z_correction), dim=1))
         else:
             z = rep.z
@@ -577,11 +623,11 @@ class DGD(nn.Module):
     
     def differential_expression(self):
         '''doing differential expression analysis'''
-        return
+        return "not implemented yet"
     
     def perturbation_experiment(self):
         '''perform a perturbation of a given feature and examine downstream effects'''
-        return
+        return "not implemented yet in this form"
     
     def get_prediction_errors(self, predictions, dataset, reduction='sum'):
         '''returns errors of given predictions

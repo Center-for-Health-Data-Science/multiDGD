@@ -229,11 +229,11 @@ class omicsDataset(Dataset):
                     n_correction_classes = len(list(np.unique(correction_features)))
             else:
                 n_correction_classes = [len(correction_features.unique())]
-            if len(n_correction_classes) > 1:
-                print('WARNING: multiple correction factors provided. Currently, only one factor is supported.')
-                print('WARNING: the first correction factor will be used.')
-            correction_features = correction_features[:,0]
-            n_correction_classes = n_correction_classes[0]
+            #if len(n_correction_classes) > 1:
+            #    print('WARNING: multiple correction factors provided. Currently, only one factor is supported.')
+            #    print('WARNING: the first correction factor will be used.')
+            #correction_features = correction_features[:,0]
+            #n_correction_classes = n_correction_classes[0]
         
         return meta, correction_features, n_correction_classes
     
@@ -241,9 +241,16 @@ class omicsDataset(Dataset):
         '''
         Transforms correction features into numerical variables for supervised training (clustering performance).
         '''
-        le = preprocessing.LabelEncoder()
-        le.fit(self.correction)
-        correction_numerical = torch.tensor(le.transform(self.correction))
+        if len(self.correction.shape) > 1:
+            correction_numerical = torch.zeros(self.correction.shape)
+            for i in range(self.correction.shape[1]):
+                le = preprocessing.LabelEncoder()
+                le.fit(self.correction[:,i])
+                correction_numerical[:,i] = torch.tensor(le.transform(self.correction[:,i]))
+        else:
+            le = preprocessing.LabelEncoder()
+            le.fit(self.correction)
+            correction_numerical = torch.tensor(le.transform(self.correction))
         return correction_numerical
     
     #def get_correction_labels(self, corr_id, idx=None):
@@ -252,9 +259,9 @@ class omicsDataset(Dataset):
         Return values of numerically transformed correction features per sample
         '''
         if idx is None:
-            return self.correction_labels.tolist()
+            return self.correction_labels#.tolist()
         else:
-            return self.correction_labels[idx].tolist()
+            return self.correction_labels[idx]#.tolist()
     
     def _check_if_mosaic(self):
         '''Check if data is mosaic data

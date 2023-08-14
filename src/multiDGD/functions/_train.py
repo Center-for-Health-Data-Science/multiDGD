@@ -171,7 +171,13 @@ def train_dgd(
                 z = representation_mosaic(idx)
                 if correction_gmm is not None:
                     correction_optim.zero_grad()
-                    z_correction = correction_rep(idx_paired).detach().clone().repeat(3,1)
+                    for corr_id in range(len(correction_rep)):
+                        if corr_id == 0:
+                            z_correction = correction_rep[corr_id](idx_paired)
+                        else:
+                            z_correction = torch.cat((z_correction,correction_rep[corr_id](idx_paired)), dim=1)
+                    #z_correction = correction_rep(idx_paired).detach().clone().repeat(3,1)
+                    z_correction = z_correction.detach().clone().repeat(3,1)
                     y = decoder(torch.cat((z, z_correction), dim=1))
                 else:
                     y = decoder(z)
