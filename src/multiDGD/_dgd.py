@@ -434,7 +434,11 @@ class DGD(nn.Module):
         with open(save_dir+model_name+'_hyperparameters.json', 'r') as fp:
             param_dict = json.load(fp)
         scaling = param_dict['scaling']
-        data.obs["train_val_test"] = load_data_splits(save_dir)
+        if "train_val_test" not in data.obs.columns:
+            try:
+                data.obs["train_val_test"] = load_data_splits(save_dir)
+            except:
+                raise ValueError("No train_val_test column in data.obs. Please provide a data object with a train_val_test column or provide a _obs.csv file in the save directory with values 'train', 'validation' and 'test' in the 'train_val_test' column.")
 
         # init model
         model = cls(
