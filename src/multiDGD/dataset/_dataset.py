@@ -84,6 +84,13 @@ class omicsDataset(Dataset):
         elif self.mosaic and label == 'test':
             self.modality_mask = self._get_mosaic_mask(data)
         """
+        # extension for external data: feature ids that are in the reference data and can be used for gradients
+        self.usable_features = None
+        if isinstance(self.data, md.MuData):
+            if self.data.mod[self.data.mod.keys()[0]].uns['usable_features'] is not None:
+                self.usable_features = []
+                for mod in self.data.mod.keys():
+                    self.usable_features.append(self.data.mod[mod].uns['usable_features'])
 
         # make shape attributes
         self.n_sample = self.data.shape[0]

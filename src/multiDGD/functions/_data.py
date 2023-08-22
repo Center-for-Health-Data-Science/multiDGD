@@ -137,6 +137,7 @@ def setup_data(data: Union[MuData, AnnData], modality_key: str=None, observable_
             for i, mod in enumerate(reference.train_set.modalities):
                 # get the new data for that modality
                 new_data.mod[mod] = ad.AnnData(X=np.zeros((temp_data.shape[0], reference.train_set.modality_features[i])), obs=temp_data.obs)
+                new_data.mod[mod].uns['usable_features'] = []
                 if mod in modalities:
                     if isinstance(data, ad.AnnData):
                         temp_data = data[:,data.var['modality'] == mod]
