@@ -161,7 +161,7 @@ def setup_data(data: Union[MuData, AnnData], modality_key: str=None, observable_
                     new_data.mod[mod].X[:,intersection_original_position] = temp_data.X[:,intersection_in_oder]
                     new_data.mod[mod].var.index = var_names
                     # add the indices of usable features as a layer (to know which can be used to compute gradients)
-                    new_data.mod[mod].layers['usable_features'] = intersection_original_position
+                    new_data.mod[mod].uns['usable_features'] = intersection_original_position
             # make a dictionary with modalities as keys and data as values
             new_data.obs = data.obs
         else:
