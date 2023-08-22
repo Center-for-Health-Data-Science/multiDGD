@@ -91,6 +91,8 @@ class omicsDataset(Dataset):
 
         # get meta data (feature for clustering) and correction factors (if applicable)
         self.meta, self.correction, self.correction_classes = self._init_meta_and_correction()
+        # keep observation and variable annotation
+        self._assing_obs_and_var()
 
         self.correction_labels = None
         if self.correction is not None:
@@ -304,3 +306,17 @@ class omicsDataset(Dataset):
             return None
         else:
             return [x[indices] for x in self.modality_mask]
+    
+    def _assing_obs_and_var(self):
+        if isinstance(self.data, md.MuData):
+            # concatenate obs from all modalities
+            obs_idx = self.data[self.modalities[0]].obs.index
+            var_idx = self.data[self.modalities[0]].var.index
+            for mod in self.modalities[1:]:
+                obs_idx = obs_idx.append(self.data[mod].obs.index)
+                var_idx = var_idx.append(self.data[mod].var.index)
+        else:
+            obs_idx = self.data.obs.index
+            var_idx = self.data.var.index
+        self.obs_idx = obs_idx
+        self.var_idx = var_idx
