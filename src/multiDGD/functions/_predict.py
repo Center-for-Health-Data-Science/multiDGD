@@ -51,7 +51,8 @@ def learn_new_representations(
     resampling_type="mean",
     resampling_samples=1,
     include_correction_error=True,
-    indices_of_new_distribution=None
+    indices_of_new_distribution=None,
+    feature_ids=None
 ):
     """
     this function creates samples from the trained GMM for each new point,
@@ -122,6 +123,7 @@ def learn_new_representations(
                 [x[:, :, : data_loader.dataset.modality_switch], x[:, :, data_loader.dataset.modality_switch :]],
                 scale=[reshape_scaling_factor(lib[:, xxx], 3) for xxx in range(decoder.n_out_groups)],
                 reduction="sample",
+                gene_id=feature_ids
             )
         best_fit_ids = torch.argmin(recon_loss_x, dim=-1).detach().cpu()
         rep_init_values[i, :] = potential_reps.clone()[best_fit_ids, :]
@@ -180,10 +182,12 @@ def learn_new_representations(
                     y,
                     [x[:, : data_loader.dataset.modality_switch], x[:, data_loader.dataset.modality_switch :]],
                     scale=[lib[:, xxx].unsqueeze(1) for xxx in range(decoder.n_out_groups)],
+                    gene_id=feature_ids
                 )
             else:
                 recon_loss_x = decoder.loss(
-                    y, [x], scale=[lib[:, xxx].unsqueeze(1) for xxx in range(decoder.n_out_groups)]
+                    y, [x], scale=[lib[:, xxx].unsqueeze(1) for xxx in range(decoder.n_out_groups)],
+                    gene_id=feature_ids
                 )
             # gmm_error = gmm.forward_split(gmm,z).sum()
             gmm_error = gmm(z).sum()
@@ -268,7 +272,7 @@ def find_new_component(data_loader,
                 [predictions[comp].unsqueeze(0) for comp in range(len(predictions))],
                 [x[:, :, : data_loader.dataset.modality_switch], x[:, :, data_loader.dataset.modality_switch :]],
                 scale=[reshape_scaling_factor(lib[:, xxx], 3) for xxx in range(decoder.n_out_groups)],
-                reduction="sample",
+                reduction="sample"
             )
         best_fit_ids = torch.argmin(recon_loss_x, dim=-1).detach().cpu()
         rep_init_values[i_newdist, :] = potential_reps.clone()[best_fit_ids, :]
