@@ -465,17 +465,23 @@ class DGD(nn.Module):
         else:
             return self.representation.z.detach().cpu().numpy()
     
-    def test(self, testdata=None, n_epochs=20):
-        self.predict_new(testdata=testdata, n_epochs=n_epochs)
+    def test(self, testdata=None, n_epochs=20, external=False):
+        self.predict_new(testdata=testdata, n_epochs=n_epochs, external=False)
 
-    def predict(self, testdata=None, n_epochs=20):
-        self.predict_new(testdata=testdata, n_epochs=n_epochs)
+    def predict(self, testdata=None, n_epochs=20, external=False):
+        self.predict_new(testdata=testdata, n_epochs=n_epochs, external=False)
         
     def init_test_set(self, testdata):
+        '''initialize test set'''
         self.test_set = omicsDataset(testdata, split='test', scaling_type=self._scaling)
+        ###
+        #2do
+        ###
+        # the omicsDataset needs to create a mask if split=='test' and the data has a mask layer
+        # which was prepared beforehand
         self.test_set.data_to_tensor()
     
-    def predict_new(self, testdata=None, n_epochs=20, include_correction_error=True, indices_of_new_distribution=None):
+    def predict_new(self, testdata=None, n_epochs=20, include_correction_error=True, indices_of_new_distribution=None, external=False):
         '''learn the embedding for new datapoints'''
 
         # prepare test set and loader
@@ -495,6 +501,9 @@ class DGD(nn.Module):
             self.test_set, batch_size=8,
             shuffle=True, num_workers=0
             )
+        usable_features = None
+        if external:
+            usable_features = self.test_set.usable_features
         
         # train that representation
         self.test_rep, self.correction_test_rep, new_correction_model = learn_new_representations(
@@ -505,7 +514,8 @@ class DGD(nn.Module):
                 self.correction_gmm,
                 n_epochs=n_epochs,
                 include_correction_error=include_correction_error,
-                indices_of_new_distribution=indices_of_new_distribution)
+                indices_of_new_distribution=indices_of_new_distribution),
+                feature_ids=usable_features
         self.param_dict['test_representation'] = True
         # make the new_correction_model an attribute so it is learned
         self.save()
