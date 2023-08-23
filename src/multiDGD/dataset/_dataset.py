@@ -23,9 +23,25 @@ class omicsDataset(Dataset):
         number of total features in dataset
     library: torch.Tensor
         tensor of per-sample and -modality scaling factors
+    sparse: bool
+        whether the data is sparse or not
+    modalities: list
+        list of modalities in data
+    modality_switch: int
+        position in data tensor where modalities switch
+    modality_features: list
+        number of features per modality
+    meta: np.array
+        array of sample-wise values of monitored clustering feature (if available)
+    correction: np.array
+        array of sample-wise values of correction features (if available)
+    correction_classes: int
+        number of classes of correction features (if available)
 
     Methods
     ----------
+    data_to_tensor()
+        Make a tensor out of data. In multi-modal cases, modalities are concatenated.
     get_labels(idx=None)
         Return sample-specific values of monitored clustering feature (if available)
     get_correction_labels(corr_id, idx=None)
