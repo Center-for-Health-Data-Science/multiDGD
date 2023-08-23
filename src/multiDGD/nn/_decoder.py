@@ -12,17 +12,29 @@ class Decoder(nn.Module):
     Attributes
     ----------
     main: torch.nn.modules.container.ModuleList
-        the decoder portion shared between modalities (if multiple available)
-        starts at representation and gives output to out_modules
+        The decoder portion shared between modalities (if multiple available)
+        starts at representation and gives output to out_modules.
     out_modules: torch.nn.modules.container.ModuleList
-        modules taking into account a specific distribution for calculating loss
-        can include more linear layers
+        Modules taking into account a specific distribution for calculating loss
+        and can include more linear layers.
+    n_out_groups: int
+        Number of output groups (i.e. modalities)
 
     Methods
     ----------
     forward(z)
-    loss(nn_output, target, scale=None, mod_id=None, gene_id=None, reduction='sum')
-    log_prob(nn_output, target, scale=None, mod_id=None, gene_id=None, reduction='sum')
+        Forward pass through the decoder.
+    loss(nn_output, target, scale=None, mod_id=None, gene_id=None, reduction='sum', mask=None)
+        Calculate the loss of the model predictions (nn_output) given the targets
+        through the negative log probability (log_prob).
+    log_prob(nn_output, target, scale=None, mod_id=None, gene_id=None, reduction='sum', mask=None)
+        Calculate the log probability of the output (nn_output) given the target. If mod_id is None,
+        the log_prob is calculated for all modalities and summed. If mod_id is not None, the log_prob
+        is calculated for the specific modality.
+        It can also be calculated for specific sets of features (gene_id) and cells (mask).
+        Scale is the scaling factor of each cell, usually the count depth. The reduction can be `sum`,
+        `sample` or `none`. `sum` sums the log_prob over all cells and features, `sample` sums over
+        all features but not over cells and `none` does not sum over cells and features.
     '''
 
     def __init__(self, in_features: int, parameter_dictionary: dict):
