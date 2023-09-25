@@ -74,7 +74,7 @@ class omicsDataset(Dataset):
         
         # now if there is a lot of cells in this data, we will prefer slower training over large memory use
         self.sparse = False
-        if self.data.shape[0] > 1e5:
+        if self.data.shape[0] > 1e6: # was 1e5 but gets error in ._get_library() from mudata.sum()
             self.sparse = True
 
         # the scaling type determines what makes the scaling factors of each sample
