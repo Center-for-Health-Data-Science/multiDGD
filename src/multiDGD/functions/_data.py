@@ -1,7 +1,6 @@
 from typing import Union, Optional, Sequence, Tuple, List, Dict, Any
 from mudata import MuData
 from anndata import AnnData
-import multiDGD
 
 import anndata as ad
 import mudata as md
@@ -10,7 +9,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 def setup_data(data: Union[MuData, AnnData], modality_key: str=None, observable_key: str =None, layer: str = None, 
-               covariate_keys: List[str] = None, train_fraction: float =0.8, include_test: bool = True, reference: multiDGD.DGD =None) -> Union[MuData, AnnData]:
+               covariate_keys: List[str] = None, train_fraction: float =0.8, include_test: bool = True, reference = None) -> Union[MuData, AnnData]:
     '''
     This function will prepare the data for the model. Input formats can be both anndata and mudata objects.
 
