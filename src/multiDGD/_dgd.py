@@ -141,6 +141,8 @@ class DGD(nn.Module):
         self.train_set = omicsDataset(data, split='train', scaling_type=self._scaling)
         if 'validation' in data.obs['train_val_test'].values:
             self.val_set = omicsDataset(data, split='validation', scaling_type=self._scaling) # if there is no validation, return None
+        else:
+            self.val_set = None
         if 'test' in data.obs['train_val_test'].values:
             self.test_set = omicsDataset(data, split='test', scaling_type=self._scaling)
         # create the train, val and test indices like in multivi
@@ -434,7 +436,13 @@ class DGD(nn.Module):
         with open(save_dir+model_name+'_hyperparameters.json', 'r') as fp:
             param_dict = json.load(fp)
         scaling = param_dict['scaling']
-        data.obs["train_val_test"] = load_data_splits(save_dir)
+        if "train_val_test" not in data.obs.columns:
+            print('No data split information found in the data.')
+            print('Trying to load it from the save directory.')
+            try:
+                data.obs["train_val_test"] = load_data_splits(save_dir)
+            except:
+                raise ValueError('No data split information found in the data or the save directory. Please provide the data split information as a csv file in the save directory with ending "_obs.csv" or as a column in the data object with column name "train_val_test".')
 
         # init model
         model = cls(
@@ -514,8 +522,8 @@ class DGD(nn.Module):
                 self.correction_gmm,
                 n_epochs=n_epochs,
                 include_correction_error=include_correction_error,
-                indices_of_new_distribution=indices_of_new_distribution),
-                feature_ids=usable_features
+                indices_of_new_distribution=indices_of_new_distribution,
+                feature_ids=usable_features)
         self.param_dict['test_representation'] = True
         # make the new_correction_model an attribute so it is learned
         self.save()
@@ -783,6 +791,8 @@ class DGD(nn.Module):
 
 def load_data_splits(save_dir):
     df_in = pd.read_csv(save_dir+'_obs.csv')
+    print(save_dir+'_obs.csv')
+    print(len(df_in))
     return df_in["train_val_test"].values
 
 default_parameters = {
