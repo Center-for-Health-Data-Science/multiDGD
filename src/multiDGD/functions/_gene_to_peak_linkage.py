@@ -195,7 +195,7 @@ def feature_linkage(model, test_set, feature_id, rna_ref, peak_ref, fold_change=
     # also get indices of samples where the value of the feature is not 0
     indices_of_interest = np.where(test_set.data[:, feature_id] != 0)[0]
 
-    predictions_original = model.decoder_forward(rep_shape=model.test_rep.z.shape[0])
+    predictions_original = model.decode(rep_shape=model.test_rep.z.shape[0])
     predictions_original = [x.detach().cpu() for x in predictions_original]
     torch.cuda.empty_cache()
 
@@ -303,7 +303,7 @@ def feature_linkage2(model, test_set, feature_id, rna_ref, peak_ref, fold_change
     # also get indices of samples where the value of the feature is not 0
     indices_of_interest = np.where(test_set.data[:, feature_id] != 0)[0]
 
-    predictions_original = model.decoder_forward(rep_shape=model.test_rep.z.shape[0])
+    predictions_original = model.decode(rep_shape=model.test_rep.z.shape[0])
     predictions_original = [x.detach().cpu() for x in predictions_original]
     torch.cuda.empty_cache()
 
@@ -434,7 +434,7 @@ def perturbation_stats(model, test_set, feature_id, rna_ref, peak_ref, fold_chan
     print(peak_ids)
     
     # get original predictions
-    output_original = model.decoder_forward(rep_shape=model.test_rep.z.shape[0])
+    output_original = model.decode(rep_shape=model.test_rep.z.shape[0])
     predictions_original = [ # keep only the predictions for the feature of interest
         output_original[0].detach().cpu()[:,gene_id],
         output_original[1].detach().cpu()[:,peak_ids],
@@ -595,7 +595,7 @@ def feature_linkage3(model, test_set, feature_id, rna_ref, peak_ref, fold_change
     # also get indices of samples where the value of the feature is not 0
     #indices_of_interest = np.where(test_set.data[:, feature_id] != 0)[0]
 
-    predictions_original = model.decoder_forward(rep_shape=model.test_rep.z.shape[0])
+    predictions_original = model.decode(rep_shape=model.test_rep.z.shape[0])
     predictions_original = [x.detach().cpu() for x in predictions_original]
     torch.cuda.empty_cache()
 

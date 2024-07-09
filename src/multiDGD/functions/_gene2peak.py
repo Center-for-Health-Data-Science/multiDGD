@@ -86,7 +86,7 @@ def predict_perturbations(model, testset, feature_id, split="test", new_data=Fal
     print("using {} samples".format(len(indices_of_interest_gene)))
     #print("using {} samples".format(len(indices_of_interest)))
 
-    predictions_original_gene = model.decoder_forward(rep_shape=model.test_rep.z.shape[0])
+    predictions_original_gene = model.decode(rep_shape=model.test_rep.z.shape[0])
     predictions_original_gene = [x.detach().to(device) for x in predictions_original_gene]
     torch.cuda.empty_cache()
 
