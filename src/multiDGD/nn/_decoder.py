@@ -106,64 +106,41 @@ class Decoder(nn.Module):
         if reduction == 'sum':
             log_prob = 0.
             if mod_id is not None:
-                if scale is None:
-                    log_prob += self.out_modules[mod_id].log_prob(nn_output,target,gene_id=gene_id,mask=mask).sum()
-                else:
-                    log_prob += self.out_modules[mod_id].log_prob(nn_output,target,scale,gene_id=gene_id,mask=mask).sum()
+                log_prob += self.out_modules[mod_id].log_prob(nn_output,target,scale,gene_id=gene_id,mask=mask).sum()
             else:
-                if scale is None:
-                    if mask is None:
-                        for i in range(self.n_out_groups):
-                            log_prob += self.out_modules[i].log_prob(nn_output[i],target[i]).sum()
-                    else:
-                        for i in range(self.n_out_groups):
-                            log_prob += self.out_modules[i].log_prob(nn_output[i],target[i],mask=mask[i]).sum()
-                else:
-                    if mask is None:
-                        for i in range(self.n_out_groups):
-                            log_prob += self.out_modules[i].log_prob(nn_output[i],target[i],scale[i]).sum()
-                    else:
-                        for i in range(self.n_out_groups):
-                            log_prob += self.out_modules[i].log_prob(nn_output[i],target[i],scale[i],mask=mask[i]).sum()
+                if gene_id is None:
+                    gene_id = [None]*self.n_out_groups
+                if mask is None:
+                    mask = [None]*self.n_out_groups
+                for i in range(self.n_out_groups):
+                    log_prob += self.out_modules[i].log_prob(nn_output[i],target[i],scale[i],gene_id=gene_id[i],mask=mask[i]).sum()
+                
         elif reduction == 'sample':
             dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             if mod_id is not None:
-                #log_prob = torch.zeros(nn_output.shape[:-1]).to(dev)
-                if scale is None:
-                    log_prob = self.out_modules[mod_id].log_prob(nn_output,target,gene_id=gene_id).sum(-1)
-                else:
-                    log_prob = self.out_modules[mod_id].log_prob(nn_output,target,scale,gene_id=gene_id).sum(-1)
+                log_prob = self.out_modules[mod_id].log_prob(nn_output,target,scale,gene_id=gene_id).sum(-1)
             else:
-                #log_prob = torch.zeros(nn_output[0].shape[:-1]).to(dev)
-                if scale is None:
-                    for i in range(self.n_out_groups):
-                        if i == 0:
-                            log_prob = self.out_modules[i].log_prob(nn_output[i],target[i]).sum(-1)
-                        else:
-                            log_prob += self.out_modules[i].log_prob(nn_output[i],target[i]).sum(-1)
-                else:
-                    for i in range(self.n_out_groups):
-                        if i == 0:
-                            log_prob = self.out_modules[i].log_prob(nn_output[i],target[i],scale[i]).sum(-1)
-                        else:
-                            log_prob += self.out_modules[i].log_prob(nn_output[i],target[i],scale[i]).sum(-1)
+                if gene_id is None:
+                    gene_id = [None]*self.n_out_groups
+                if mask is None:
+                    mask = [None]*self.n_out_groups
+                for i in range(self.n_out_groups):
+                    if i == 0:
+                        log_prob = self.out_modules[i].log_prob(nn_output[i],target[i],scale[i],gene_id=gene_id[i],mask=mask[i]).sum(-1)
+                    else:
+                        log_prob += self.out_modules[i].log_prob(nn_output[i],target[i],scale[i],gene_id=gene_id[i],mask=mask[i]).sum(-1)
         else:
             dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             if mod_id is not None:
                 log_prob = torch.zeros(nn_output.shape).to(dev)
-                if scale is None:
-                    log_prob += self.out_modules[mod_id].log_prob(nn_output,target,gene_id=gene_id)
-                else:
-                    log_prob += self.out_modules[mod_id].log_prob(nn_output,target,scale,gene_id=gene_id)
+                log_prob += self.out_modules[mod_id].log_prob(nn_output,target,scale,gene_id=gene_id)
             else:
                 if len(self.out_modules) > 1:
                     raise ValueError('This combination does not work. No loss reduction can only be done for single modalities')
                 else:
+                    if gene_id is None:
+                        gene_id = [None]*self.n_out_groups
                     log_prob = torch.zeros(nn_output[0].shape[:-1]).to(dev)
-                    if scale is None:
-                        for i in range(self.n_out_groups):
-                            log_prob += self.out_modules[i].log_prob(nn_output[i],target[i])
-                    else:
-                        for i in range(self.n_out_groups):
-                            log_prob += self.out_modules[i].log_prob(nn_output[i],target[i],scale[i])
+                    for i in range(self.n_out_groups):
+                        log_prob += self.out_modules[i].log_prob(nn_output[i],target[i],scale[i],gene_id=gene_id[i])
         return log_prob

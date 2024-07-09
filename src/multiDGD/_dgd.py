@@ -194,6 +194,8 @@ class DGD(nn.Module):
         self.train_set = omicsDataset(data, split='train', scaling_type=self._scaling)
         if 'validation' in data.obs['train_val_test'].values:
             self.val_set = omicsDataset(data, split='validation', scaling_type=self._scaling) # if there is no validation, return None
+        else:
+            self.val_set = None
         if 'test' in data.obs['train_val_test'].values:
             self.test_set = omicsDataset(data, split='test', scaling_type=self._scaling)
         # create the train, val and test indices like in multivi
@@ -488,6 +490,8 @@ class DGD(nn.Module):
             param_dict = json.load(fp)
         scaling = param_dict['scaling']
         if "train_val_test" not in data.obs.columns:
+            print('No data split information found in the data.')
+            print('Trying to load it from the save directory.')
             try:
                 data.obs["train_val_test"] = load_data_splits(save_dir)
             except:
@@ -522,17 +526,23 @@ class DGD(nn.Module):
         else:
             return self.representation.z.detach().cpu().numpy()
     
-    def test(self, testdata=None, n_epochs=20):
-        self._predict_new(testdata=testdata, n_epochs=n_epochs)
+    def test(self, testdata=None, n_epochs=20, external=False):
+        self.predict_new(testdata=testdata, n_epochs=n_epochs, external=False)
 
-    def predict(self, testdata=None, n_epochs=20):
-        self._predict_new(testdata=testdata, n_epochs=n_epochs)
+    def predict(self, testdata=None, n_epochs=20, external=False):
+        self.predict_new(testdata=testdata, n_epochs=n_epochs, external=False)
         
-    def _init_test_set(self, testdata):
+    def init_test_set(self, testdata):
+        '''initialize test set'''
         self.test_set = omicsDataset(testdata, split='test', scaling_type=self._scaling)
+        ###
+        #2do
+        ###
+        # the omicsDataset needs to create a mask if split=='test' and the data has a mask layer
+        # which was prepared beforehand
         self.test_set.data_to_tensor()
     
-    def _predict_new(self, testdata=None, n_epochs=20, include_correction_error=True, indices_of_new_distribution=None):
+    def predict_new(self, testdata=None, n_epochs=20, include_correction_error=True, indices_of_new_distribution=None, external=False):
         '''learn the embedding for new datapoints'''
 
         # prepare test set and loader
@@ -552,6 +562,20 @@ class DGD(nn.Module):
             self.test_set, batch_size=8,
             shuffle=True, num_workers=0
             )
+        usable_features = None
+        if external:
+            usable_features = self.test_set.usable_features
+        # check if the testset has the same number of modalities and features as the trainset
+        self.test_modality_translator = None
+        if self.test_set.modalities != self.train_set.modalities:
+            self.test_modality_translator = []
+            if len(self.test_set.modalities) <= len(self.train_set.modalities):
+                # acceptable, now need to find which modality is provided and if the number of features match
+                for i, modality in enumerate(self.train_set.modalities):
+                    if modality in self.test_set.modalities:
+                        self.test_modality_translator.append(i)
+            else:
+                raise ValueError("The test set has more modalities than the train set. This can not be handled.")
         
         # train that representation
         self.test_rep, self.correction_test_rep, new_correction_model = learn_new_representations(
@@ -562,7 +586,9 @@ class DGD(nn.Module):
                 self.correction_gmm,
                 n_epochs=n_epochs,
                 include_correction_error=include_correction_error,
-                indices_of_new_distribution=indices_of_new_distribution)
+                indices_of_new_distribution=indices_of_new_distribution,
+                feature_ids=usable_features,
+                modality_translator=self.test_modality_translator)
         self.param_dict['test_representation'] = True
         # make the new_correction_model an attribute so it is learned
         self.save()
@@ -848,6 +874,8 @@ class DGD(nn.Module):
 
 def load_data_splits(save_dir):
     df_in = pd.read_csv(save_dir+'_obs.csv')
+    print(save_dir+'_obs.csv')
+    print(len(df_in))
     return df_in["train_val_test"].values
 
 default_parameters = {

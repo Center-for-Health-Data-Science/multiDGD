@@ -100,6 +100,13 @@ class omicsDataset(Dataset):
         elif self.mosaic and label == 'test':
             self.modality_mask = self._get_mosaic_mask(data)
         """
+        # extension for external data: feature ids that are in the reference data and can be used for gradients
+        self.usable_features = None
+        if isinstance(self.data, md.MuData):
+            if self.data.mod[self.data.mod.keys()[0]].uns['usable_features'] is not None:
+                self.usable_features = []
+                for mod in self.data.mod.keys():
+                    self.usable_features.append(self.data.mod[mod].uns['usable_features'])
 
         # make shape attributes
         self.n_sample = self.data.shape[0]
@@ -107,6 +114,8 @@ class omicsDataset(Dataset):
 
         # get meta data (feature for clustering) and correction factors (if applicable)
         self.meta, self.correction, self.correction_classes = self._init_meta_and_correction()
+        # keep observation and variable annotation
+        self._assing_obs_and_var()
 
         self.correction_labels = None
         if self.correction is not None:
@@ -190,6 +199,7 @@ class omicsDataset(Dataset):
                 # currently only support 2 modalities
                 modality_features = [int(np.where(self.data.var['modality'] == modalities[1])[0][0]), int((self.data.shape[1]-np.where(self.data.var['modality'] == modalities[1])[0][0]))]
             else:
+                switch = None
                 modality_features = [int(self.data.shape[1])]
             return modalities, switch, modality_features
     
@@ -319,3 +329,17 @@ class omicsDataset(Dataset):
             return None
         else:
             return [x[indices] for x in self.modality_mask]
+    
+    def _assing_obs_and_var(self):
+        if isinstance(self.data, md.MuData):
+            # concatenate obs from all modalities
+            obs_idx = self.data[self.modalities[0]].obs.index
+            var_idx = self.data[self.modalities[0]].var.index
+            for mod in self.modalities[1:]:
+                obs_idx = obs_idx.append(self.data[mod].obs.index)
+                var_idx = var_idx.append(self.data[mod].var.index)
+        else:
+            obs_idx = self.data.obs.index
+            var_idx = self.data.var.index
+        self.obs_idx = obs_idx
+        self.var_idx = var_idx
