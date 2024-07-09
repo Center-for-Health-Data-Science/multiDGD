@@ -52,7 +52,8 @@ def learn_new_representations(
     resampling_samples=1,
     include_correction_error=True,
     indices_of_new_distribution=None,
-    feature_ids=None
+    feature_ids=None,
+    modality_translator=None
 ):
     """
     this function creates samples from the trained GMM for each new point,
@@ -125,6 +126,21 @@ def learn_new_representations(
                 reduction="sample",
                 gene_id=feature_ids
             )
+        elif modality_translator is not None:
+            if len(modality_translator) == 1:
+                recon_loss_x = decoder.loss(
+                    predictions[modality_translator[0]],
+                    x,
+                    scale=reshape_scaling_factor(lib, 3),
+                    reduction="sample",
+                    gene_id=feature_ids,
+                    mod_id=modality_translator[0]
+                )
+            else:
+                # in order to support this I will have to do something about modality switches, or rather split the data in the dataset class to make it all easier
+                raise ValueError("correcting modality order mismatches between train and test data is not yet supported. Please prepare the data accordingly.")
+        else:
+            raise ValueError("modality switch or modality must be provided")
         best_fit_ids = torch.argmin(recon_loss_x, dim=-1).detach().cpu()
         rep_init_values[i, :] = potential_reps.clone()[best_fit_ids, :]
 
@@ -185,10 +201,20 @@ def learn_new_representations(
                     gene_id=feature_ids
                 )
             else:
-                recon_loss_x = decoder.loss(
-                    y, [x], scale=[lib[:, xxx].unsqueeze(1) for xxx in range(decoder.n_out_groups)],
-                    gene_id=feature_ids
-                )
+                # previous version, only worked for first modality
+                #recon_loss_x = decoder.loss(
+                #    y, [x], scale=[lib[:, xxx].unsqueeze(1) for xxx in range(decoder.n_out_groups)],
+                #    gene_id=feature_ids
+                #)
+                if modality_translator is not None:
+                    if len(modality_translator) == 1:
+                        recon_loss_x = decoder.loss(
+                            y[modality_translator[0]],
+                            x,
+                            scale=lib.unsqueeze(1),
+                            gene_id=feature_ids,
+                            mod_id=modality_translator[0]
+                        )
             # gmm_error = gmm.forward_split(gmm,z).sum()
             gmm_error = gmm(z).sum()
             correction_error = torch.zeros(1).to(device)

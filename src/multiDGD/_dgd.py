@@ -512,6 +512,17 @@ class DGD(nn.Module):
         usable_features = None
         if external:
             usable_features = self.test_set.usable_features
+        # check if the testset has the same number of modalities and features as the trainset
+        self.test_modality_translator = None
+        if self.test_set.modalities != self.train_set.modalities:
+            self.test_modality_translator = []
+            if len(self.test_set.modalities) <= len(self.train_set.modalities):
+                # acceptable, now need to find which modality is provided and if the number of features match
+                for i, modality in enumerate(self.train_set.modalities):
+                    if modality in self.test_set.modalities:
+                        self.test_modality_translator.append(i)
+            else:
+                raise ValueError("The test set has more modalities than the train set. This can not be handled.")
         
         # train that representation
         self.test_rep, self.correction_test_rep, new_correction_model = learn_new_representations(
@@ -523,7 +534,8 @@ class DGD(nn.Module):
                 n_epochs=n_epochs,
                 include_correction_error=include_correction_error,
                 indices_of_new_distribution=indices_of_new_distribution,
-                feature_ids=usable_features)
+                feature_ids=usable_features,
+                modality_translator=self.test_modality_translator)
         self.param_dict['test_representation'] = True
         # make the new_correction_model an attribute so it is learned
         self.save()
