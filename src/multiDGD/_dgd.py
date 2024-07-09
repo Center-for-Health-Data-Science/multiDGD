@@ -22,44 +22,97 @@ class DGD(nn.Module):
     '''
     This is the main class for the Deep Generative Decoder.
     Given a mudata or anndata object, it creates an instance of the DGD
-    with all necessary classes from the data.
+    with some hyperparameters chosen from the data. 
+    Customization can be achieved by providing a parameter dictionary.
 
-    Attributes (non-optional ones)
+    Attributes
     ----------
     train_set: omicsDataset
-        Dataset object derived from only obligatory input `data`.
-        it's properties (shape, modality type, observable feature classes) 
-        are used to build remaining instances
+        Dataset object derived from input data.
+        It's properties (shape, modality type, observable feature classes) 
+        are used to build remaining instances.
+        val_set and test_set are optional and only initialized if given (see data preparation).
     param_dict: dict
-        dictionary containing hyperparameters for building model instances and training.
+        Dictionary containing hyperparameters for building model instances and training.
         Initialized with default parameters and updated with optional user input.
     decoder: Decoder
-        decoder instance initialized based on desired latent dimensionality
+        Decoder instance initialized based on desired latent dimensionality
         and data features.
     representation: RepresentationLayer
-        learnable representation vectors for the training set
+        Learnable representation vectors for the training set. If val_set and or test_set are available,
+        additional representations are initialized as validation_rep and test_rep.
     gmm: GMM
         Gaussian mixture model instance for the distribution over latent space.
         If no other information is given (but received a clustering observable),
         number of components is automatically set to the number of classes.
+    latent: int
+        Number of latent dimensions.
+    trained_status: torch.bool
+        Boolean indicating whether the model has been trained or not.
+    history: dict
+        Dictionary containing training history (loss, clustering performance, etc.)
+    
+    Attributes (optional)
+    ---------------------
+    correction_gmm: Supervized GMM (optional)
+        Gaussian mixture model instance for the distribution over covariate space.
+        The number of components is automatically set to the number of classes in the provided covariate.
+    correction_rep: RepresentationLayer (optional)
+        Learnable representation vectors for the covariate space. If val_set and or test_set are available,
+        additional representations are initialized as correction_val_rep and correction_test_rep.
 
     Methods
     ----------
+    view_data_setup()
+        Shows the data setup and all included omicsDataset objects.
     train(n_epochs=500, stop_with='loss', stop_after=10, train_minimum=50)
         training of the model instances (decoder, representation, gmm) for a given
         number of epochs with early stopping. 
         Early stopping can be based on the training (or validation, if applicable) loss
         or on the clustering performance on a desired observable (e.g. cell type).
-    save()
-        saving the model parameters
-    load()
-        loading trained model parameters to initialized model
-    get_representation()
-        access training representations
-    predict_new()
-        learn representations for new data
-    differential_expression()
-        perform differential expression analysis on selected groupings of data
+    save(save_dir=None, model_name=None)
+        Saving the model parameters and hyperparameters to a given directory.
+    load(data, save_dir='./', random_seed = 0,model_name='dgd')
+        Loading trained model parameters and data to initialize the model.
+    get_representation(split='train')
+        Access the representation for a given data split.
+    get_covariate_representation(split='train')
+        Access the covariate representation for a given data split.
+    clustering(split='train')
+        Return the GMM clustering of the given data split. This will return the
+        component index with the highest probability for each cell.
+    test(testdata=None, n_epochs=20)
+        Learn new representations for the test set or new data. If testdata is None,
+        the test set is used. If testdata is given, it will be used to create a new
+        omicsDataset object as test_set and learn a representation for it.
+    predict(testdata=None, n_epochs=20)
+        Same as test.
+    get_prediction_errors(predictions, dataset, reduction='sum')
+        Calculate the prediction error between the model output and the data.
+        Reduction can be `sum`, `sample` or `gene`, 
+        which defines the resolution and shape of the output.
+    get_normalized_expression(dataset, indices)
+        Returns the normalized expression for a given split of the data (train, val, test).
+        If indices are provided, only the expression for these cells is returned.
+    get_accessibility_estimates(dataset, indices)
+        Returns the accessibility for a given split of the data (train, val, test).
+        If indices are provided, only the accessibility for these cells is returned.
+    get_reconstruction(dataset)
+        Returns all model predictions for a given split of the data (train, val, test).
+    get_modality_reconstruction(dataset, mod_id)
+        Returns the prediction of a specific modality for a given split of the data (train, val, test).
+        This is more flexible than the MultiVI-compatible methods, as it allows to access
+        the prediction of a specific modality and is not limited to the `RNA-ATAC` structure.
+    plot_history(export=False)
+        Plotting reconstruction error curves colored by data split.
+        If export is True, the plot is saved to the save_dir.
+    plot_latent_space()
+        Plotting a PCA of the training representations, GMM components and GMM samples.
+    gene2peak(gene_name, testset, gene_ref=None)
+        Perform gene2peak in silico knockdown experiment on the testset for a given gene (gene_name).
+        gene_ref is the column name of the testset.var data frame.
+        If no reference dataframe for the genes is provided, 
+        the position of the gene of interest is searched among the testset.var indices.
     '''
 
     def __init__(
@@ -152,7 +205,7 @@ class DGD(nn.Module):
         self.total_cells = data.n_obs
 
         # save the data split in case people don't keep this info
-        self.save_data_splits(data)
+        self._save_data_splits(data)
 
 
     def _init_parameter_dictionary(self, init_dict=None):
@@ -352,9 +405,9 @@ class DGD(nn.Module):
         if model_name is None:
             model_name = self._model_name
         torch.save(self.state_dict(), save_dir+model_name+'.pt')
-        self.save_param_dict_to_file(save_dir+model_name)
+        self._save_param_dict_to_file(save_dir+model_name)
     
-    def load_parameters(self):
+    def _load_parameters(self):
         '''load model'''
         # load state dict
         checkpoint = torch.load(self._save_dir+self._model_name+'.pt',map_location=torch.device('cpu'))
@@ -408,7 +461,7 @@ class DGD(nn.Module):
         print('#######################')
         print(self.trained_status.item())
     
-    def save_param_dict_to_file(self, save_dir):
+    def _save_param_dict_to_file(self, save_dir):
         #for x in self.param_dict.keys():
         #    if type(self.param_dict[x]) == list:
         #        print((x, [(type(self.param_dict[x][i]), sys.getsizeof(self.param_dict[x][i])) for i in range(len(self.param_dict[x]))]))
@@ -419,7 +472,7 @@ class DGD(nn.Module):
         #with open(save_dir+'_hyperparameters.yml', 'w') as outfile:
         #    yaml.dump(self.param_dict, outfile, default_flow_style=False)
     
-    def save_data_splits(self, data):
+    def _save_data_splits(self, data):
         # save as csv with the obs names
         df_out = data.obs.copy()
         df_out.to_csv(self._save_dir+'_obs.csv')
@@ -442,7 +495,7 @@ class DGD(nn.Module):
             try:
                 data.obs["train_val_test"] = load_data_splits(save_dir)
             except:
-                raise ValueError('No data split information found in the data or the save directory. Please provide the data split information as a csv file in the save directory with ending "_obs.csv" or as a column in the data object with column name "train_val_test".')
+                raise ValueError("No train_val_test column in data.obs. Please provide a data object with a train_val_test column or provide a _obs.csv file in the save directory with values 'train', 'validation' and 'test' in the 'train_val_test' column.")
 
         # init model
         model = cls(
@@ -455,7 +508,7 @@ class DGD(nn.Module):
                 print_outputs=False
             )
         
-        model.load_parameters()
+        model._load_parameters()
         return model
     
     def get_latent_representation(self, data=None):
@@ -494,7 +547,7 @@ class DGD(nn.Module):
 
         # prepare test set and loader
         if testdata is not None:
-            self.init_test_set(testdata)
+            self._init_test_set(testdata)
         else:
             self.test_set.data_to_tensor()
             if not hasattr(self, "test_set"):
@@ -540,7 +593,7 @@ class DGD(nn.Module):
         # make the new_correction_model an attribute so it is learned
         self.save()
     
-    def decoder_forward(self, rep_shape, i=None):
+    def _decoder_forward(self, rep_shape, i=None):
         if self.representation.z.shape[0] == rep_shape:
             if self.correction_gmm is not None:
                 if i is not None:
@@ -675,7 +728,7 @@ class DGD(nn.Module):
         '''
         # get the dimensions of the dataset
         shape = dataset.X.shape[0]
-        return self.decoder_forward(shape, indices)[0]
+        return self._decoder_forward(shape, indices)[0]
     
     def get_accessibility_estimates(self, dataset, indices):
         '''
@@ -684,16 +737,16 @@ class DGD(nn.Module):
         '''
         # get the dimensions of the dataset
         shape = dataset.X.shape[0]
-        return self.decoder_forward(shape, indices)[1]
+        return self._decoder_forward(shape, indices)[1]
     
     def get_modality_reconstruction(self, dataset, mod_id):
         shape = dataset.X.shape[0]
-        predictions = self.decoder_forward(shape, torch.arange(shape))[mod_id]
+        predictions = self._decoder_forward(shape, torch.arange(shape))[mod_id]
         return predictions*self.library[mod_id].unsqueeze(0)
     
     def get_reconstruction(self, dataset):
         shape = dataset.X.shape[0]
-        predictions = self.decoder_forward(shape, torch.arange(shape))
+        predictions = self._decoder_forward(shape, torch.arange(shape))
         return predictions
     
     def view_data_setup(self):
@@ -718,6 +771,24 @@ class DGD(nn.Module):
             latent[self.validation_indices,:] = self.validation_rep.z.detach().cpu().numpy()
             latent[self.test_indices,:] = self.test_rep.z.detach().cpu().numpy()
             return latent
+    
+    def get_covariate_representation(self, split='train'):
+        '''This will also need to be changed once multiple covariates are supported'''
+        if self.correction_rep is not None:
+            if split == 'train':
+                return self.correction_rep.z.detach().cpu().numpy()
+            elif split == 'validation':
+                return self.correction_val_rep.z.detach().cpu().numpy()
+            elif split == 'test':
+                return self.correction_test_rep.z.detach().cpu().numpy()
+            elif split == 'all':
+                latent = np.zeros((self.total_cells, self.correction_rep.z.shape[1]))
+                latent[self.train_indices,:] = self.correction_rep.z.detach().cpu().numpy()
+                latent[self.validation_indices,:] = self.correction_val_rep.z.detach().cpu().numpy()
+                latent[self.test_indices,:] = self.correction_test_rep.z.detach().cpu().numpy()
+                return latent
+        else:
+            raise ValueError('covariate representation not available (were not defined)')
     
     def clustering(self, split='train'):
         if split == 'train':
