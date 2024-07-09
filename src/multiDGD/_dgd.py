@@ -648,6 +648,9 @@ class DGD(nn.Module):
             raise ValueError('something is wrong with the shape of the dataset you supplied. There is no representation for it.')
         return y
     
+    def decode(self, rep_shape, i=None):
+        return self._decoder_forward(rep_shape, i)
+    
     def predict_from_representation(self, rep, correction_rep=None):
         if self.correction_gmm is not None:
             z = rep.z
