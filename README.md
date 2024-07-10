@@ -10,6 +10,8 @@ Our base functionalities (embedding and data integration) come with some extreme
 
 In addition to a general improvement for data integration and clustering, we are proud to present gene2peak. This feature provides insight into associations between genes and peaks in single cells by performing in silico perturbations and accumulating cell-type specific changes in the transcriotion or chromatin landscape of multiome data.
 
+<span style="color:blue">**Detailed documentation in progress**</span>
+
 ## Installation
 
 Since this is the alpha-version, the package should be installed by cloning the repository and installing it from source (from the project directory). Please note that the package requires Python version 3.8 or higher.
@@ -17,6 +19,8 @@ Since this is the alpha-version, the package should be installed by cloning the 
 ```
 pip install .
 ```
+
+<span style="color:blue">The model is compatible with scverse and will soon be installable via pip.</span>
 
 ## How to use it
 
