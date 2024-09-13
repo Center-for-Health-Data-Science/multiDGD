@@ -10,8 +10,8 @@ A full example of a minimal workflow is given in the following notebook:
 
 .. toctree::
 
-    tutorials/data
-    tutorials/training
-    tutorials/integration
-    tutorials/plotting
-    tutorials/gene2peak
+    tutorials-folder/data
+    tutorials-folder/training
+    tutorials-folder/integration
+    tutorials-folder/plotting
+    tutorials-folder/gene2peak
