@@ -1,8 +1,16 @@
 API
 ===
 
+.. automodule:: multiDGD
+
+.. rubric:: Modules
+
 .. autosummary::
     :toctree: generated
     :recursive:
-    
-    multiDGD
+
+    dataset
+    functions
+    latent
+    nn
+    utils
