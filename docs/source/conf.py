@@ -24,6 +24,7 @@ extensions = [
     'sphinx_design',
     'sphinxemoji.sphinxemoji',
     'sphinx_copybutton',
+    'sphinxcontrib.bibtex'
 ]
 autosummary_generate = True 
 
@@ -36,6 +37,7 @@ autodoc_default_options = {
     #"private-members": True
 }
 
+bibtex_bibfiles = ['references.bib']
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

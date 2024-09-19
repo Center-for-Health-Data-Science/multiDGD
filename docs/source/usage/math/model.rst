@@ -1,6 +1,10 @@
 Math
 ====
 
+.. note::
+
+    This section is (in most part) a direct excerpt from the multiDGD paper :cite:`Schuster2024`.
+
 Notation
 --------
 
@@ -49,10 +53,6 @@ Notation
 
 Probabilistic formulation
 -------------------------
-
-.. note::
-
-    The following section is (in most part) a direct excerpt from the multiDGD paper.
 
 The training objective is given by the joint probability 
 

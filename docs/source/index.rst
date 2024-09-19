@@ -6,14 +6,14 @@
 multiDGD Documentation
 ====================================
 
-multiDGD is a new generative model for multi-omics data and provides the following functionalities:
+multiDGD :cite:`Schuster2024` is a new generative model for multi-omics data and provides the following functionalities:
 
 * low-dimensional embedding
 * data integration
 * modality prediction
 * gene2peak association (NEW |:tada:|)
 
-Our base functionalities (embedding and data integration) come with some extreme upgrades in comparison to MultiVI thanks to our base method, the `Deep Generative Decoder <https://academic.oup.com/bioinformatics/article/39/9/btad497/7241685>`_. The low-dimensional embedding is more structured and provides improved clustering. We are especially proud of having improved the data integration, by modelling covariates probabilistically, which enables users to integrate even data from unseen covariates without the need for architectural surgery.
+Our base functionalities (embedding and data integration) come with some extreme upgrades in comparison to MultiVI thanks to our base method, the `Deep Generative Decoder <https://academic.oup.com/bioinformatics/article/39/9/btad497/7241685>`_ :cite:`SchusterKrogh2023`. The low-dimensional embedding is more structured and provides improved clustering. We are especially proud of having improved the data integration, by modelling covariates probabilistically, which enables users to integrate even data from unseen covariates without the need for architectural surgery.
 
 In addition to a general improvement for data integration and clustering, we are proud to present gene2peak. This feature provides insight into associations between genes and peaks in single cells by performing in silico perturbations and accumulating cell-type specific changes in the transcriotion or chromatin landscape of multiome data.
 
@@ -29,7 +29,6 @@ In addition to a general improvement for data integration and clustering, we are
    usage/tutorials
    usage/intro
    api
-   usage/references
    GitHub <https://github.com/Center-for-Health-Data-Science/multiDGD/tree/main>
 
 .. grid:: 2
@@ -54,3 +53,7 @@ In addition to a general improvement for data integration and clustering, we are
       :link: api.html
 
       The API reference provides detailed information on the functions and classes in multiDGD.
+
+.. rubric:: References
+
+.. bibliography:: references.bib
