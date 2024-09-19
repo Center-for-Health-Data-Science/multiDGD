@@ -2,3 +2,4 @@ sphinx-design
 sphinxemoji
 sphinx-copybutton
 sphinxcontrib-bibtex
+sphinx_rtd_theme
