@@ -1,4 +1,4 @@
-multiDGD.utils
+﻿multiDGD.utils
 ==============
 
 .. automodule:: multiDGD.utils

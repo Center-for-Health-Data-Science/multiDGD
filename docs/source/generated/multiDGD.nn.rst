@@ -1,4 +1,4 @@
-multiDGD.nn
+﻿multiDGD.nn
 ===========
 
 .. automodule:: multiDGD.nn

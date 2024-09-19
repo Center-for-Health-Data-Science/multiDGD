@@ -1,4 +1,4 @@
-multiDGD.functions
+﻿multiDGD.functions
 ==================
 
 .. automodule:: multiDGD.functions

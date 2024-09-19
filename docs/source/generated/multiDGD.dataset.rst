@@ -1,4 +1,4 @@
-multiDGD.dataset
+﻿multiDGD.dataset
 ================
 
 .. automodule:: multiDGD.dataset

@@ -1,4 +1,4 @@
-multiDGD.latent
+﻿multiDGD.latent
 ===============
 
 .. automodule:: multiDGD.latent
