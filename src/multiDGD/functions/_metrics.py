@@ -4,6 +4,7 @@ from sklearn import preprocessing
 from sklearn.metrics import adjusted_rand_score
 
 def count_parameters(model):
+    '''count the number of trainable parameters in a model'''
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 def clustering_metric(r, gmm, labels):

@@ -13,16 +13,16 @@ def setup_data(data: Union[MuData, AnnData], modality_key: str=None, observable_
     '''
     This function will prepare the data for the model. Input formats can be both anndata and mudata objects.
 
-    Parameters
+    Arguments
     ----------
     data : anndata or mudata object
-    layer : str, optional
-        Layer of the data to use. If None, use X. The default is None.
     modality_key: str, optional
         If the object is not a mudata object, this key will be used to define the modalities of the data.
     observable_key: str, optional
         Key of the 'observable' factor that will be used to define the number of GMM components in the prior distribution.
         If None, the model initialization will ask for a definition of the numberof components. The default is None.
+    layer : str, optional
+        Layer of the data to use. If None, use X. The default is None.
     covariate_keys: list, optional
         List of keys of the 'nuisance' factors that should be excluded from the biological representation,
         i.e. batch, donor, disease state, ... The default is None.
@@ -35,7 +35,7 @@ def setup_data(data: Union[MuData, AnnData], modality_key: str=None, observable_
 
     Returns
     -------
-    Anndata or mudata object
+    Anndata or mudata object with the data prepared for the model.
 
     '''
 

@@ -1,6 +1,7 @@
 import os
 import torch
 import numpy as np
+import random
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -13,8 +14,13 @@ from sklearn.metrics import silhouette_score
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def set_random_seed(seed):
+    '''
+    Setting a random seed for reproducibility
+    (including numpy, random, and torch)
+    '''
     torch.manual_seed(seed)
     np.random.seed(seed)
+    random.seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
