@@ -11,6 +11,19 @@ class omicsDataset(Dataset):
     General Dataset class for single cell data.
     Applicable for sinlge modalities and multi-modal data.
 
+    Arguments
+    ----------
+    data: mudata or anndata object
+        data object containing the data
+    scaling_type: str
+        for different scaling options (currently only supporting 'sum')
+    
+    Arguments (optional)
+    --------------------
+    split: str
+        If only a subset of the data should be used. Can be 'train', 'validation', 'test'.
+        The default is None, meaning that the full data is used.
+
     Attributes
     ----------
     data: torch.Tensor
@@ -37,15 +50,9 @@ class omicsDataset(Dataset):
         array of sample-wise values of correction features (if available)
     correction_classes: int
         number of classes of correction features (if available)
-
+    
     Methods
-    ----------
-    data_to_tensor()
-        Make a tensor out of data. In multi-modal cases, modalities are concatenated.
-    get_labels(idx=None)
-        Return sample-specific values of monitored clustering feature (if available)
-    get_correction_labels(corr_id, idx=None)
-        Return values of numerically transformed correction features per sample
+    -------
     '''
     def __init__(self,
             data,
@@ -325,6 +332,7 @@ class omicsDataset(Dataset):
             return None, self._get_mosaic_mask(self.data), None, None
     
     def get_mask(self, indices):
+        '''Return a list of tensors that indicate which samples belong to which modality'''
         if self.modality_mask is None:
             return None
         else:

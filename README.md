@@ -10,7 +10,9 @@ Our base functionalities (embedding and data integration) come with some extreme
 
 In addition to a general improvement for data integration and clustering, we are proud to present gene2peak. This feature provides insight into associations between genes and peaks in single cells by performing in silico perturbations and accumulating cell-type specific changes in the transcriotion or chromatin landscape of multiome data.
 
-**Detailed documentation in progress.**
+## Documentation
+
+Find out more and keep updated on our [documentation page](https://multidgd.readthedocs.io/en/latest/).
 
 ## Installation
 

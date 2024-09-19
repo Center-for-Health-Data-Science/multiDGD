@@ -13,6 +13,21 @@ class RepresentationLayer(torch.nn.Module):
 
     The representations can be updated once per epoch by standard pytorch optimizers.
 
+    Arguments
+    ----------
+    n_rep: int
+        dimensionality of the representation space
+    n_sample: int
+        number of samples to be modelled (has to match corresponding dataset)
+    
+    Arguments (optional)
+    --------------------
+    value_init: str or torch.nn.parameter.Parameter
+        defines how the representations are initialized
+        - 'zero': all representations are initialized at zero
+        - torch.Tensor: a tensor of shape (n_sample,n_rep) to initialize the representations
+        - float: a float to initialize all representations (not recommended)
+    
     Attributes
     ----------
     n_rep: int
@@ -20,12 +35,10 @@ class RepresentationLayer(torch.nn.Module):
     n_sample: int
         number of samples to be modelled (has to match corresponding dataset)
     z: torch.nn.parameter.Parameter
-        tensor of learnable representations of shape (n_sample,n_rep)
+        tensor of shape (n_sample,n_rep) that holds the representations as learnable parameters
 
     Methods
     ----------
-    forward(idx=None)
-        takes sample index and returns corresponding representation
     '''
     
     def __init__(self,

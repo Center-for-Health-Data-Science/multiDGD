@@ -9,6 +9,19 @@ class Decoder(nn.Module):
     Class for the DGD decoder with output modules modelling data 
     according to a modality-specific distribution.
 
+    Arguments
+    ----------
+    in_features: int
+        Number of input features (i.e. representation size)
+    parameter_dictionary: dict
+        Dictionary containing the parameters for the decoder, including:
+        - n_hidden: number of hidden layers in the main body
+        - n_units: number of units in the hidden layers
+        - n_hidden_modality: number of hidden layers in the output modules
+        - n_features_per_modality: number of features in each output module
+        - modalities: list of modalities to be modelled
+        - decoder_width: width of the output layers (as a multiplier for n_units)
+
     Attributes
     ----------
     main: torch.nn.modules.container.ModuleList
@@ -22,19 +35,6 @@ class Decoder(nn.Module):
 
     Methods
     ----------
-    forward(z)
-        Forward pass through the decoder.
-    loss(nn_output, target, scale=None, mod_id=None, gene_id=None, reduction='sum', mask=None)
-        Calculate the loss of the model predictions (nn_output) given the targets
-        through the negative log probability (log_prob).
-    log_prob(nn_output, target, scale=None, mod_id=None, gene_id=None, reduction='sum', mask=None)
-        Calculate the log probability of the output (nn_output) given the target. If mod_id is None,
-        the log_prob is calculated for all modalities and summed. If mod_id is not None, the log_prob
-        is calculated for the specific modality.
-        It can also be calculated for specific sets of features (gene_id) and cells (mask).
-        Scale is the scaling factor of each cell, usually the count depth. The reduction can be `sum`,
-        `sample` or `none`. `sum` sums the log_prob over all cells and features, `sample` sums over
-        all features but not over cells and `none` does not sum over cells and features.
     '''
 
     def __init__(self, in_features: int, parameter_dictionary: dict):
@@ -81,6 +81,7 @@ class Decoder(nn.Module):
         self.shap_compatible = False
     
     def forward(self, z):
+        '''forward pass through the decoder'''
         for i in range(len(self.main)):
             z = self.main[i](z)
         if not self.shap_compatible:
@@ -90,18 +91,21 @@ class Decoder(nn.Module):
         return out
     
     def loss(self, nn_output, target, scale=None, mod_id=None, gene_id=None, reduction='sum', mask=None):
+        '''
+        Calculate the loss of the model predictions (nn_output) given the targets
+        through the negative log probability (log_prob).
+        '''
         return (-self.log_prob(nn_output, target, scale, mod_id, gene_id, reduction, mask))
     
     def log_prob(self, nn_output, target, scale=None, mod_id=None, gene_id=None, reduction='sum', mask=None):
         '''
-        calculating the log probability
-        
-        This function is providied with different options of how the output should be provided.
-        All log-probs can be summed into one value (reduction == 'sum'), summed per sample ('sample')
-        or not reduced at all (thus giving a log-prob per feature per sample).
-
-        mask has been added to support training of mosaic data, where a modality can be missing
-        For now I only added it to the base loss computation where reduction is sum
+        Calculate the log probability of the output (nn_output) given the target. If mod_id is None,
+        the log_prob is calculated for all modalities and summed. If mod_id is not None, the log_prob
+        is calculated for the specific modality.
+        It can also be calculated for specific sets of features (gene_id) and cells (mask).
+        Scale is the scaling factor of each cell, usually the count depth. The reduction can be `sum`,
+        `sample` or `none`. `sum` sums the log_prob over all cells and features, `sample` sums over
+        all features but not over cells and `none` does not sum over cells and features.
         '''
         if reduction == 'sum':
             log_prob = 0.

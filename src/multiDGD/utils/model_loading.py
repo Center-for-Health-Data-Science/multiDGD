@@ -4,6 +4,10 @@ import requests, zipfile
 BASE_URL = 'https://api.figshare.com/v2'
 
 def get_figshare_file(f_url, f_name, f_zip=False):
+    '''
+    Download a file from figshare and save it to the current directory
+    '''
+    
     # check if file already exists
     if not os.path.exists(f_name):
         file_url = BASE_URL + f_url

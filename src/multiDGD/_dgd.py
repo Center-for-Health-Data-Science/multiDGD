@@ -25,12 +25,33 @@ class DGD(nn.Module):
     with some hyperparameters chosen from the data. 
     Customization can be achieved by providing a parameter dictionary.
 
+    Arguments
+    ----------
+    data: omicsDataset
+        Dataset including train, validation (and if applicable test) set.
+    
+    Arguments (optional)
+    ---------------------
+    parameter_dictionary: dict
+        Dictionary containing custom hyperparameters for building model instances and training.
+    scaling: str
+        Scaling relationship between model output and data. Default is 'sum'.
+        We are currently only supporting sum, but we will soon add 'mean'.
+    save_dir: str
+        Directory where the model is saved. Default is './'.
+    random_seed: int
+        Random seed for reproducibility. Default is 0.
+    model_name: str
+        Name of the model. Default is 'dgd'.
+    print_outputs: bool
+        Print model outputs. Default is False.
+    
+    
     Attributes
     ----------
     train_set: omicsDataset
-        Dataset object derived from input data.
-        It's properties (shape, modality type, observable feature classes) 
-        are used to build remaining instances.
+        Dataset object derived from input data. 
+        It’s properties (shape, modality type, observable feature classes) are used to build remaining instances. 
         val_set and test_set are optional and only initialized if given (see data preparation).
     param_dict: dict
         Dictionary containing hyperparameters for building model instances and training.
@@ -60,59 +81,9 @@ class DGD(nn.Module):
     correction_rep: RepresentationLayer (optional)
         Learnable representation vectors for the covariate space. If val_set and or test_set are available,
         additional representations are initialized as correction_val_rep and correction_test_rep.
-
+    
     Methods
-    ----------
-    view_data_setup()
-        Shows the data setup and all included omicsDataset objects.
-    train(n_epochs=500, stop_with='loss', stop_after=10, train_minimum=50)
-        training of the model instances (decoder, representation, gmm) for a given
-        number of epochs with early stopping. 
-        Early stopping can be based on the training (or validation, if applicable) loss
-        or on the clustering performance on a desired observable (e.g. cell type).
-    save(save_dir=None, model_name=None)
-        Saving the model parameters and hyperparameters to a given directory.
-    load(data, save_dir='./', random_seed = 0,model_name='dgd')
-        Loading trained model parameters and data to initialize the model.
-    get_representation(split='train')
-        Access the representation for a given data split.
-    get_covariate_representation(split='train')
-        Access the covariate representation for a given data split.
-    clustering(split='train')
-        Return the GMM clustering of the given data split. This will return the
-        component index with the highest probability for each cell.
-    test(testdata=None, n_epochs=20)
-        Learn new representations for the test set or new data. If testdata is None,
-        the test set is used. If testdata is given, it will be used to create a new
-        omicsDataset object as test_set and learn a representation for it.
-    predict(testdata=None, n_epochs=20)
-        Same as test.
-    get_prediction_errors(predictions, dataset, reduction='sum')
-        Calculate the prediction error between the model output and the data.
-        Reduction can be `sum`, `sample` or `gene`, 
-        which defines the resolution and shape of the output.
-    get_normalized_expression(dataset, indices)
-        Returns the normalized expression for a given split of the data (train, val, test).
-        If indices are provided, only the expression for these cells is returned.
-    get_accessibility_estimates(dataset, indices)
-        Returns the accessibility for a given split of the data (train, val, test).
-        If indices are provided, only the accessibility for these cells is returned.
-    get_reconstruction(dataset)
-        Returns all model predictions for a given split of the data (train, val, test).
-    get_modality_reconstruction(dataset, mod_id)
-        Returns the prediction of a specific modality for a given split of the data (train, val, test).
-        This is more flexible than the MultiVI-compatible methods, as it allows to access
-        the prediction of a specific modality and is not limited to the `RNA-ATAC` structure.
-    plot_history(export=False)
-        Plotting reconstruction error curves colored by data split.
-        If export is True, the plot is saved to the save_dir.
-    plot_latent_space()
-        Plotting a PCA of the training representations, GMM components and GMM samples.
-    gene2peak(gene_name, testset, gene_ref=None)
-        Perform gene2peak in silico knockdown experiment on the testset for a given gene (gene_name).
-        gene_ref is the column name of the testset.var data frame.
-        If no reference dataframe for the genes is provided, 
-        the position of the gene of interest is searched among the testset.var indices.
+    -------
     '''
 
     def __init__(
@@ -335,18 +306,19 @@ class DGD(nn.Module):
         print(self.trained_status.item())
     
     def is_trained(self):
+        '''Return the training status of the model (bool)'''
         print(self.trained_status.item())
     
     def train(self, n_epochs=500, stop_with='loss', stop_after=10, train_minimum=50, developer_mode=False):
         '''
-        train model for n_epochs
+        Training of the model instances (decoder, representation, gmm) for a given
+        number of epochs with early stopping. 
         
-        options for early stopping are 'loss' and 'clustering' (which requires meta_label in DGD init)
-        
-        ealry stopping observation interval is stop_after, and a minimum number of epochs to be trained
+        Options for early stopping are 'loss' and 'clustering' (which requires meta_label in DGD init).
+        Ealry stopping observation interval is 'stop_after', and a minimum number of epochs to be trained
         can be specified with train_minimum
 
-        developer_mode defines how progress is displayed.
+        'developer_mode' defines how progress is displayed.
         If false, it is assumed that a jupyter notebook is used. Then, progress will be shown in a progress bar.
         If true, a wandb run will be initialized, logging many training metrics.
         '''
@@ -399,7 +371,15 @@ class DGD(nn.Module):
         self._get_train_status()
     
     def save(self, save_dir=None, model_name=None):
-        '''save trained parameters'''
+        '''
+        Save trained parameters
+        
+        'save_dir' is the directory where the model is saved and 'model_name' is the name of the model.
+        If no alternative directory and name are provided, the default model directory and name are used.
+        'save_dir' and 'model_name' can be specified as strings.
+
+        The model is saved as a .pt file and the hyperparameters are saved as a .json file.
+        '''
         if save_dir is None:
             save_dir = self._save_dir
         if model_name is None:
@@ -484,6 +464,13 @@ class DGD(nn.Module):
             random_seed = 0,
             model_name='dgd'
         ):
+        '''
+        Load a trained model
+
+        'data' is the data object used for training the model. It has to be the same data object as used for training.
+        'save_dir' is the directory where the model is saved and 'model_name' is the name of the model.
+        
+        '''
 
         # get saved hyper-parameters
         with open(save_dir+model_name+'_hyperparameters.json', 'r') as fp:
@@ -512,7 +499,14 @@ class DGD(nn.Module):
         return model
     
     def get_latent_representation(self, data=None):
-        '''returning all representations of training data'''
+        '''
+        Access the learned latent representations of the model
+
+        'data' is the data object for which the latent representation is requested.
+        If no data is provided, the training representations are returned.
+        Otherwise, the method checks which representations the data belongs to 
+        by the number of samples and returns the corresponding representation.
+        '''
         if data is not None:
             shape = data.shape
             if self.representation.z.shape[0] == shape:
@@ -523,13 +517,17 @@ class DGD(nn.Module):
             elif self.test_rep is not None:
                 if self.test_rep.z.shape[0] == shape:
                     return self.test_rep.z.detach().cpu().numpy()
+            else:
+                raise ValueError('The data shape does not match any representation.')
         else:
             return self.representation.z.detach().cpu().numpy()
     
     def test(self, testdata=None, n_epochs=20, external=False):
+        '''high-level call of predict_new'''
         self.predict_new(testdata=testdata, n_epochs=n_epochs, external=False)
 
     def predict(self, testdata=None, n_epochs=20, external=False):
+        '''high-level call of predict_new'''
         self.predict_new(testdata=testdata, n_epochs=n_epochs, external=False)
         
     def init_test_set(self, testdata):
@@ -543,7 +541,17 @@ class DGD(nn.Module):
         self.test_set.data_to_tensor()
     
     def predict_new(self, testdata=None, n_epochs=20, include_correction_error=True, indices_of_new_distribution=None, external=False):
-        '''learn the embedding for new datapoints'''
+        '''
+        Find the embedding for new datapoints
+
+        'testdata' is the data object for which the latent representation is requested.
+        If no data is provided, the test split is used.
+
+        'n_epochs' is the number of epochs the local optimization is run for.
+
+        'external' is a boolean indicating whether the data is external to the training data.
+        If the data is external, the model will first check if the number of modalities and features match the training data.
+        '''
 
         # prepare test set and loader
         if testdata is not None:
@@ -649,9 +657,21 @@ class DGD(nn.Module):
         return y
     
     def decode(self, rep_shape, i=None):
+        '''
+        Decode the representations of a given shape
+
+        The shape has to match either the train-, validation- or test-set.
+        '''
         return self._decoder_forward(rep_shape, i)
     
     def predict_from_representation(self, rep, correction_rep=None):
+        '''
+        Predict/decode from a given representation
+
+        The representation has to be a RepresentationLayer object.
+
+        If a correction_rep is provided, the correction model is used.
+        '''
         if self.correction_gmm is not None:
             z = rep.z
             z_correction = correction_rep.z
@@ -662,16 +682,22 @@ class DGD(nn.Module):
         return y
     
     def differential_expression(self):
-        '''doing differential expression analysis'''
+        '''Placeholder for differential expression analysis'''
         return
     
     def perturbation_experiment(self):
-        '''perform a perturbation of a given feature and examine downstream effects'''
+        '''Placeholder for one-line perturbation experiment'''
         return
     
     def get_prediction_errors(self, predictions, dataset, reduction='sum'):
-        '''returns errors of given predictions
-        reduction: `sum`, `sample` or `none` (defines error shape)'''
+        '''
+        Returns errors of given predictions
+
+        'predictions' is a list of tensors with the model output.
+        'dataset' is the data object for which the error is calculated.
+
+        reduction: `sum`, `sample` or `none` (defines error shape)
+        '''
         if reduction == 'sum':
             error = torch.zeros((1))
         elif reduction == 'sample':
@@ -726,8 +752,8 @@ class DGD(nn.Module):
     
     def get_normalized_expression(self, dataset, indices):
         '''
-        given a representation for the dataset is learned, returns the normalized (unscaled) model output
-        currently only implemented for multiome
+        Given a representation for the dataset is learned, returns the normalized (unscaled) model output.
+        Currently only implemented for multiome.
         '''
         # get the dimensions of the dataset
         shape = dataset.X.shape[0]
@@ -735,24 +761,36 @@ class DGD(nn.Module):
     
     def get_accessibility_estimates(self, dataset, indices):
         '''
-        given a representation for the dataset is learned, returns the normalized (unscaled) model output
-        currently only implemented for multiome
+        Given a representation for the dataset is learned, returns the normalized (unscaled) model output.
+        Currently only implemented for multiome.
         '''
         # get the dimensions of the dataset
         shape = dataset.X.shape[0]
         return self._decoder_forward(shape, indices)[1]
     
     def get_modality_reconstruction(self, dataset, mod_id):
+        '''
+        Given a representation for the dataset is learned, returns the model output
+        for a given modality ('mod_id').
+        '''
         shape = dataset.X.shape[0]
         predictions = self._decoder_forward(shape, torch.arange(shape))[mod_id]
         return predictions*self.library[mod_id].unsqueeze(0)
     
     def get_reconstruction(self, dataset):
+        '''
+        Given a representation for the dataset is learned, returns the model output.
+        '''
         shape = dataset.X.shape[0]
         predictions = self._decoder_forward(shape, torch.arange(shape))
         return predictions
     
     def view_data_setup(self):
+        '''
+        Print the data setup
+        
+        This tells you how the data was split and how many samples are in each split.
+        '''
         print("The prepared data consists of the following training set:")
         print(self.train_set)
         if hasattr(self, "val_set"):
@@ -761,6 +799,11 @@ class DGD(nn.Module):
             print("And a test set with {} samples".format(self.test_set.n_sample))
     
     def get_representation(self, split='train'):
+        '''
+        Return the representation of the model based on the data split.
+        
+        'split' can be 'train', 'validation', 'test' or 'all'
+        '''
         if split == 'train':
             return self.representation.z.detach().cpu().numpy()
         elif split == 'validation':
@@ -776,7 +819,13 @@ class DGD(nn.Module):
             return latent
     
     def get_covariate_representation(self, split='train'):
-        '''This will also need to be changed once multiple covariates are supported'''
+        '''
+        Return the covariate representation of the model based on the data split.
+        
+        'split' can be 'train', 'validation', 'test' or 'all'
+
+        Currently only supported for a single covariate.
+        '''
         if self.correction_rep is not None:
             if split == 'train':
                 return self.correction_rep.z.detach().cpu().numpy()
@@ -794,6 +843,13 @@ class DGD(nn.Module):
             raise ValueError('covariate representation not available (were not defined)')
     
     def clustering(self, split='train'):
+        '''
+        Return the clustering of the model based on the data split.
+
+        This returns numeric labels of which GMM component a sample belongs to.
+
+        'split' can be 'train', 'validation', 'test' or 'all'
+        '''
         if split == 'train':
             return self.gmm.clustering(self.representation.z.detach()).detach().cpu().numpy().astype(int)
         elif split == 'validation':
@@ -831,6 +887,12 @@ class DGD(nn.Module):
             plt.show()
     
     def plot_latent_space(self):
+        '''
+        Plot the latent space of the model as PCA.
+
+        Points are representations, GMM means and GMM samples.
+        '''
+        
         from sklearn.decomposition import PCA
         import matplotlib.pyplot as plt
         palette = ['#58A6A6', '#EFA355', '#421E22']
@@ -859,6 +921,14 @@ class DGD(nn.Module):
         plt.show()
     
     def gene2peak(self, gene_name, testset, gene_ref=None):
+        '''
+        Perform gene2peak in silico knockdown experiment on the testset for a given gene ('gene_name'). 
+        
+        'gene_ref' is the column name of the testset.var data frame. 
+        
+        If no reference dataframe for the genes is provided, 
+        the position of the gene of interest is searched among the 'testset.var' indices.
+        '''
         if gene_name not in testset.var_names:
             if gene_ref is not None:
                 if isinstance(gene_ref, str):

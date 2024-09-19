@@ -93,9 +93,24 @@ class GaussianMixture(nn.Module):
     '''
     A mixture of multi-variate Gaussians.
 
-    m_mix_comp is the number of components in the mixture
-    dim is the dimension of the space
-    covariance_type can be "fixed", "isotropic" or "diagonal"
+    Arguments
+    ----------
+    m_mix_comp: int
+        number of components in the mixture
+    dim: int
+        dimension of the space
+    
+    Arguments (optional)
+    --------------------
+    covariance_type: str
+        can be "fixed", "isotropic" or "diagonal"
+    mean_init: tuple
+        mean_init = (radius, hardness) of the softball prior for the GMM means
+    sd_init: tuple
+        sd_init = (mean, sd) of the Gaussian prior for the standard deviations
+    weight_alpha: float
+        alpha parameter of the Dirichlet prior on the mixture weights
+    
     the mean_prior is initialized as a softball (mollified uniform) with
         mean_init(<radius>, <hardness>)
     neglogvar_prior is a prior class for the negative log variance of the mixture components
@@ -126,25 +141,6 @@ class GaussianMixture(nn.Module):
 
     Methods
     ----------
-    forward(x)
-        returning negative log probability density of a set of representations
-    log_prob(x)
-        computes summed log probability density
-    sample(n_sample)
-        creates n_sample random samples from the GMM (taking into account mixture weights)
-    component_sample(n_sample)
-        creates n_sample new samples PER mixture component
-    sample_probs(x)
-        computes log-probs per sample (not summed and not including priors)
-    sample_new_points(n_points, option='random', n_new=1)
-        creating new samples either like in component_sample or from component means
-    reshape_targets(y, y_type='true')
-        reshaping targets (true counts) to be comparable to model outputs 
-        from multiple representations per sample
-    choose_best_representations(x, losses)
-        reducing new representations to 1 per sample (based on lowest loss)
-    choose_old_or_new(z_new, loss_new, z_old, loss_old)
-        selecting best representation per sample between tow representation tensors (pairwise)
     '''
 
     def __init__(self,
@@ -250,11 +246,12 @@ class GaussianMixture(nn.Module):
     
     @property
     def covariance(self):
-        '''transform negative log variance into covariances'''
+        '''return covariances of the components'''
         return torch.exp(-self.neglogvar)
     
     @property
     def stddev(self):
+        '''return standard deviation of the components'''
         return torch.sqrt(self.covariance)
 
     def _Distribution(self):
@@ -265,13 +262,15 @@ class GaussianMixture(nn.Module):
             return D.MixtureSameFamily(mix, comp)
 
     def sample(self,n_sample):
-        '''create samples from the GMM distribution'''
+        '''draw samples from the GMM distribution'''
         with torch.no_grad():
             gmm = self._Distribution()
             return gmm.sample(torch.tensor([n_sample]))
 
     def component_sample(self,n_sample):
-        '''Returns a sample from each component. Tensor shape (n_sample,n_mix_comp,dim)'''
+        '''returns a sample from each component
+        
+        Tensor shape (n_sample,n_mix_comp,dim)'''
         with torch.no_grad():
             comp = D.Independent(D.Normal(self.mean,torch.exp(-0.5*self.neglogvar)), 1)
             return comp.sample(torch.tensor([n_sample]))
@@ -301,7 +300,8 @@ class GaussianMixture(nn.Module):
 
     def sample_new_points(self, resample_type='mean', n_new_samples=1):
         '''
-        creates a Tensor with potential new representations. 
+        Creates a Tensor with potential new representations
+
         These can be drawn from component samples if resample_type is 'sample' or
         from the mean if 'mean'. For drawn samples, n_new_samples defines the number
         of random samples drawn from each component.
@@ -315,24 +315,30 @@ class GaussianMixture(nn.Module):
 
 class GaussianMixtureSupervised(GaussianMixture):
     '''
-    Supervised GaussianMixutre class.
+    Supervised GaussianMixutre class (child of GaussianMixture)
 
-    Attributes
+    Arguments
     ----------
     Nclass: int
         number of classes to be modeled
     Ncpc: int
         number of components that should model each class
+    dim: int
+        dimension of the space
+    
+    Arguments (optional)
+    --------------------
+    covariance_type: str
+        can be "fixed", "isotropic" or "diagonal"
+    mean_init: tuple
+        mean_init = (radius, hardness) of the softball prior for the GMM means
+    sd_init: tuple
+        sd_init = (mean, sd) of the Gaussian prior for the standard deviations
+    alpha: float
+        alpha parameter of the Dirichlet prior on the mixture weights
 
     Methods
     ----------
-    forward(x,label)
-        computes negative log densities of representations
-        if a supervision label is given for a sample, 
-        all components not assigned to the class are ignored in computation
-    log_prob(x,label=None)
-    label_mixture_probs(label)
-    supervised_sampling(label,sample_type='random')
     '''
 
     def __init__(self,
@@ -350,6 +356,13 @@ class GaussianMixtureSupervised(GaussianMixture):
         self.Ncpc = Ncompperclass # number of components per class
 
     def forward(self,x,label=None):
+        '''
+        Forward pass computes the negative log density
+        of the probability of z being drawn from the mixture model
+
+        If label is not provided, the function returns the unsupervised loss.
+        Otherwise, it returns the supervised loss.
+        '''
 
         # return unsupervized loss if there are no labels provided
         if label is None:
@@ -388,12 +401,15 @@ class GaussianMixtureSupervised(GaussianMixture):
         return - y
     
     def log_prob(self,x,label=None):
+        '''return the log density of the probability of z being drawn from the mixture model'''
         return - self.forward(x,label=label)
 
     def label_mixture_probs(self,label):
+        '''transform weights to mixture probabilites'''
         return torch.softmax(self.weight[label],dim=-1)
     
     def supervised_sampling(self, label, sample_type='random'):
+        '''Sample from the GMM for supervised learning'''
         # get samples for each component
         if sample_type == 'origin':
             # choose the component means

@@ -1,0 +1,14 @@
+anndata
+matplotlib
+mudata
+numpy
+pandas
+scanpy
+scikit-learn
+scipy
+torch
+sphinx-design
+sphinxemoji
+sphinx-copybutton
+sphinxcontrib-bibtex
+sphinx_rtd_theme

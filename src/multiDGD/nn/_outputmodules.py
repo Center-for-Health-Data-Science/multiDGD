@@ -9,6 +9,21 @@ class OutputModule(nn.Module):
     '''
     This is the basis output module class that stands between the decoder and the output data.
 
+    Arguments
+    ----------
+    in_features: int
+        number of features going into this layer
+    out_features: int
+        number of features that come out of this layer
+    n_hidden: int
+        number of hidden layers
+    hidden_features: int
+        number of features in hidden layers
+    modality: str
+        modality of the data
+    layer_width: int
+        width of the output layers (as a multiplier for n_units)
+
     Attributes
     ----------
     fc: torch.nn.modules.container.ModuleList
@@ -21,12 +36,6 @@ class OutputModule(nn.Module):
 
     Methods
     ----------
-    forward(x)
-        input goes through fc modulelist and distribution layer
-    loss(model_output,target,scaling_factor,gene_id=None,mask=None)
-        returns loss of distribution for given output
-    log_prob(model_output,target,scaling_factor,gene_id=None,mask=None)
-        returns log-prob of distribution for given output
     '''
 
     def __init__(self,
@@ -34,7 +43,7 @@ class OutputModule(nn.Module):
         out_features: int, 
         n_hidden: int, 
         hidden_features: int,
-        modality: list,
+        modality: str,
         layer_width: int
     ):
         super(OutputModule, self).__init__()
@@ -70,19 +79,23 @@ class OutputModule(nn.Module):
             raise ValueError(error_message)
 
     def forward(self,x):
+        '''forward pass through the output module'''
         for i in range(len(self.fc)):
             x = self.fc[i](x)
         return self.distribution(x)
     
     def forward_shap(self,x):
+        '''placeholder for SHAP compatibility'''
         for i in range(len(self.fc)):
             x = self.fc[i](x)
         return x
     
     def loss(self,model_output,target,scaling_factor,gene_id=None,mask=None):
+        '''returns loss of the output module'''
         return self.distribution.loss(model_output,target,scaling_factor,gene_id,mask)
     
     def log_prob(self,model_output,target,scaling_factor,gene_id=None,mask=None):
+        '''returns log-prob of the output module'''
         return self.distribution.log_prob(model_output,target,scaling_factor,gene_id,mask)
 
 def logNBdensity(k,m,r):
@@ -107,6 +120,15 @@ class NB_Layer(nn.Module):
     '''
     This is the Negative Binomial version of the OutputModule distribution layer.
 
+    Arguments
+    ----------
+    out_features: int
+        number of features that come out of this layer
+    r_init: int
+        initial value for the log-dispersion parameter
+    scaling_type: str
+        type of scaling to be applied to the output
+
     Attributes
     ----------
     fc: torch.nn.modules.container.ModuleList
@@ -117,14 +139,6 @@ class NB_Layer(nn.Module):
 
     Methods
     ----------
-    forward(x)
-        applies scaling-specific activation
-    loss(model_output,target,scaling_factor,gene_id=None,mask=None)
-        returns loss of NB for given output
-    log_prob(model_output,target,scaling_factor,gene_id=None,mask=None)
-        returns log-prob of NB for given output
-    rescale(scaling_factor,model_output)
-        rescales the model output according to the scaling factor
     '''
     def __init__(self, out_features, r_init=2, scaling_type='sum'):
         super(NB_Layer, self).__init__()
@@ -138,13 +152,16 @@ class NB_Layer(nn.Module):
             self._activation = 'softmax'
     
     def forward(self, x):
+        '''forward pass through the NB layer'''
         return F.softmax(x,dim=-1)
     
     @staticmethod
     def rescale(scaling_factor,model_output):
+        '''rescales the model output (mean normalized count)'''
         return (scaling_factor*model_output)
     
     def log_prob(self,model_output,target,scaling_factor,gene_id=None,mask=None):
+        '''returns the log-prob of the NB layer'''
         # the model output represents the mean normalized count
         # the scaling factor is the used normalization
         if gene_id is not None:
@@ -156,6 +173,7 @@ class NB_Layer(nn.Module):
         return logprob
     
     def norm_abs_error(self,model_output,target,scaling_factor,gene_id=None,mask=None):
+        '''returns the normalized absolute error of the NB layer'''
         if gene_id is not None:
             error = torch.abs(target[:,gene_id] - self.rescale(scaling_factor,model_output)[:,gene_id])/target[:,gene_id]
         else:
@@ -165,9 +183,11 @@ class NB_Layer(nn.Module):
         return error
     
     def loss(self,model_output,target,scaling_factor,gene_id=None,mask=None):
+        '''returns the loss of the NB layer'''
         neglogprob = - self.log_prob(model_output,target,scaling_factor,gene_id,mask=None)
         return neglogprob
     
     @property
     def dispersion(self):
+        '''returns the dispersion parameter'''
         return (torch.exp(self.log_r)+1)

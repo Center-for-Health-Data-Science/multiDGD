@@ -9,6 +9,16 @@ import torch
 import collections
 
 def sc_feature_selection(data, modalities, feature_selection):
+    '''
+    takes a MuData or AnnData object and a feature selection mode and returns the data with the selected features
+
+    'modalities' needs to be provided if the data is an AnnData object (if the obs does not contain a column called 'modality')
+
+    feature_selection can be:
+    - a list of floats, where each float is the percentage of features to keep for each modality
+    - an integer, where it presents the variance threshold for all modalities
+    - a float, where the same percentage of features is kept for all modalities
+    '''
     if isinstance(feature_selection, list):
         selection_method = 'variance'
     elif feature_selection > 1:
