@@ -1,7 +1,4 @@
-sphinx
-sphinx.ext.autodoc
-sphinx.ext.autosummary
-sphinx_design
-sphinxemoji.sphinxemoji
-sphinx_copybutton
-sphinxcontrib.bibtex
+sphinx-design
+sphinxemoji
+sphinx-copybutton
+sphinxcontrib-bibtex
