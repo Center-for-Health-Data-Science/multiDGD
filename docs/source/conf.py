@@ -3,7 +3,7 @@ import sys
 #sys.path.insert(0, os.path.abspath('../..'))
 
 # Get the absolute path to the package.
-path = os.path.abspath("../../src/multiDGD")
+path = os.path.abspath("../../src")
 
 # Insert the path into the PATH.
 sys.path.insert(0, path)
