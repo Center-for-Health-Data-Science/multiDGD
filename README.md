@@ -22,6 +22,8 @@ Since this is the alpha-version, the package should be installed by cloning the 
 pip install .
 ```
 
+*The model is compatible with scverse and will soon be installable via pip.*
+
 ## How to use it
 
 Check out the notebooks showing examples of how to use multiDGD for anndata objects and mudata objects in the tutorials folder. There is also a preliminary tutorial on the gene2peak feature. This is still in development as a tool though and currently only supports a very specific use.
