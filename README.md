@@ -18,10 +18,10 @@ Find out more and keep updated on our [documentation page](https://multidgd.read
 
 ## Installation
 
-Since this is the alpha-version, the package should be installed by cloning the repository and installing it from source (from the project directory). Please note that the package requires Python version 3.8 or higher.
+Please note that the package requires Python version 3.8 or higher.
 
 ```
-pip install .
+pip install multiDGD@git+https://github.com/Center-for-Health-Data-Science/multiDGD
 ```
 
 *The model is compatible with scverse and will soon be installable via pip.*
