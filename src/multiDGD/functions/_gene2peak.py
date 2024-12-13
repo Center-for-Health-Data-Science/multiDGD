@@ -6,6 +6,18 @@ from multiDGD.dataset import omicsDataset
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+def get_closest_peak(chrom, start, end, ref_df):
+    sub_df = ref_df[ref_df["Chromosome"] == chrom]
+    # now find the peaks that contain the gene
+    sub_df = sub_df[
+        ((sub_df["Start"] <= int(start)) & (sub_df["End"] >= int(end))) | # peak contains gene
+        ((sub_df["Start"] >= int(start)) & (sub_df["End"] <= int(end))) | # gene contains peak
+        ((sub_df["Start"] <= int(start)) & (sub_df["End"] >= int(start))) | # peak starts before gene
+        ((sub_df["Start"] <= int(end)) & (sub_df["End"] >= int(end))) # peak ends after gene
+        ]
+    closest_peak = list(sub_df['idx'].values)
+    return closest_peak
+
 def find_closest_peak(gene_location):
     chrom = int(gene_location.split(":")[0].split("chr")[1])
     start = gene_location.split(":")[1].split("-")[0]

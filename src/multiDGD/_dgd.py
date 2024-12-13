@@ -555,7 +555,7 @@ class DGD(nn.Module):
 
         # prepare test set and loader
         if testdata is not None:
-            self._init_test_set(testdata)
+            self.init_test_set(testdata)
         else:
             self.test_set.data_to_tensor()
             if not hasattr(self, "test_set"):
