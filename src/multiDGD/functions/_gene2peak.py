@@ -67,7 +67,7 @@ def predict_perturbations_internal(model, rep, correction, dataset, modality_id,
     preds = model.predict_from_representation(rep, correction)
     return [x.detach() for x in preds]
 
-def predict_perturbations(model, testset, feature_id, split="test", new_data=False):
+def predict_perturbations(model, testset, feature_id, split="test", new_data=False, steps=1, n_epochs=100):
     test_set = omicsDataset(
         testset,
     )
@@ -78,6 +78,8 @@ def predict_perturbations(model, testset, feature_id, split="test", new_data=Fal
             model.correction_test_rep = None
     
     # get up- and downregulated predictions for our given gene
+    if new_data:
+        model.predict(testdata=test_set, n_epochs=n_epochs, external=False)
     reps_original = model.test_rep.z.detach().clone().cpu().numpy()
     # also get indices of samples where the value of the feature is not 0
     #indices_of_interest = np.where(test_set.data[:,feature_id+model.train_set.modality_switch] != 0)[0]
@@ -99,7 +101,7 @@ def predict_perturbations(model, testset, feature_id, split="test", new_data=Fal
         test_set,
         modality_id=0,
         feature_id=feature_id,
-        n_epochs=1
+        n_epochs=steps
     )
     predictions_original_gene = [x[indices_of_interest_gene,:] for x in predictions_original_gene]
     predictions_upregulated_gene = [x.detach()[indices_of_interest_gene,:] for x in predictions_upregulated_gene]
