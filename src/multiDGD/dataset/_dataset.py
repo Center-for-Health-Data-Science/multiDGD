@@ -110,7 +110,7 @@ class omicsDataset(Dataset):
         # extension for external data: feature ids that are in the reference data and can be used for gradients
         self.usable_features = None
         if isinstance(self.data, md.MuData):
-            if self.data.mod[list(self.data.mod.keys())[0]].uns['usable_features'] is not None:
+            if 'usable_features' in self.data.mod[list(self.data.mod.keys())[0]].uns.keys():
                 self.usable_features = []
                 for mod in self.data.mod.keys():
                     self.usable_features.append(self.data.mod[mod].uns['usable_features'])
